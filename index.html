@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="GTMx Flight Document Manager" />
+  <meta name="description" content="GTMx Trip Document Manager" />
   <meta name="theme-color" content="#0f172a" />
-  <title>GTMx Flight Document Manager</title>
+  <title>GTMx Trip Document Manager</title>
 
   <style>
     :root {
@@ -507,9 +507,9 @@
   <main class="app-shell">
     <section class="hero">
       <div>
-        <h1>GTMx Flight Document Manager</h1>
+        <h1>GTMx Trip Document Manager</h1>
         <p>
-          앱을 열거나 '새로고침'버튼을 누르면 Active Trip의 Flight Document를 자동으로 갱신.
+          앱을 열거나 '새로고침'버튼을 누르면 Active Trip의 Document를 자동으로 갱신.
         </p>
       </div>
 </section>
@@ -531,7 +531,7 @@
         <p class="card-subtitle">
           Completed, Cancelled 및 Draft Trip은 미표시
           Local Date 기준이며,
-          Status를 누르면 저장된 Flight Document가 Open
+          Status를 누르면 해당 Trip Document가 Open
         </p>
 
         <div class="table-wrap">
@@ -870,7 +870,7 @@
     /**
      * 앱을 열 때 자동 실행
      *
-     * Active Trip의 최신 Flight Document를 동기화하고
+     * Active Trip의 최신 Document를 동기화하고
      * Trip 및 저장 PDF 목록을 다시 불러옵니다.
      * 확인창과 완료 알림은 표시하지 않습니다.
      */
@@ -1178,7 +1178,7 @@
       ) {
         alert(
           tripNumber +
-          '의 저장된 Flight Document가 없습니다.\n' +
+          '의 저장된 Trip Document가 없습니다.\n' +
           '먼저 새로고침을 실행하세요.'
         );
 
