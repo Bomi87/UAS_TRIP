@@ -541,7 +541,7 @@
   <div>
     <h1>GTMx Trip Document Manager</h1>
     <p>
-      앱을 열거나 '새로고침' 버튼을 누르면 Active Trip의 Document를 자동으로 갱신합니다.
+      '새로고침' 버튼을 누르면 Active Trip의 Document를 즉시 갱신합니다.
     </p>
   </div>
 
@@ -922,62 +922,7 @@
      * Trip 및 저장 PDF 목록을 다시 불러옵니다.
      * 확인창과 완료 알림은 표시하지 않습니다.
      */
-    async function autoSyncOnLoad() {
-      if (state.busy) {
-        return;
-      }
-
-      setBusy(true);
-
-      try {
-        writeLog('앱 시작 자동 동기화', {
-          action: 'sync'
-        });
-
-        const result =
-          await callBackend('sync');
-
-        writeLog(
-          '앱 시작 자동 동기화 완료',
-          result
-        );
-
-        await Promise.all([
-          loadTrips(),
-          loadFiles()
-        ]);
-
-      } catch (error) {
-        writeLog(
-          '앱 시작 자동 동기화 실패',
-          {
-            error: error.message
-          }
-        );
-
-        try {
-          await Promise.all([
-            loadTrips(),
-            loadFiles()
-          ]);
-        } catch (loadError) {
-          writeLog(
-            '기존 현황 조회 실패',
-            {
-              error: loadError.message
-            }
-          );
-        }
-
-        alert(
-          '자동 새로고침 중 오류가 발생했습니다.\n' +
-          error.message
-        );
-
-      } finally {
-        setBusy(false);
-      }
-    }
+   
 
 
     async function runSync() {
@@ -1538,7 +1483,7 @@ function startGtmxAppAfterAuth() {
   }
 
   // 인증 완료 후 데이터 동기화 시작
-  autoSyncOnLoad();
+refreshDashboard();
 }
 
 (function waitForPortalAuth() {
