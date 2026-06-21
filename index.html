@@ -601,19 +601,13 @@
           </table>
         </div>
       </article>
-
-      <article class="card">
-        <h2>실행 로그</h2>
-        <p class="card-subtitle">
-          프런트엔드 요청 및 Apps Script 응답을 표시합니다.
-        </p>
-        <pre class="log" id="logOutput">대기 중...</pre>
-      </article>
+      <pre id="logOutput" hidden></pre>
     </section>
-<div
-  class="modal-backdrop"
+
+    <div
+      class="modal-backdrop"
   id="routeModal"
-  onclick="closeRouteModal(event)"
+      onclick="closeRouteModal(event)"
 >
   <div
     class="route-modal"
@@ -651,65 +645,56 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbwh9JFntEJZhjk4zJp6UhdNFUDImxLRMTF2duEErAtp6VikVL7uZKtlZJ7Wt6NHmXfySw/exec';
+      'https://script.google.com/macros/s/AKfycbyfPIydE-MfT8tvnXRlrcc2COgHiTuSfhXbdsvdmZpO1b-YaK1WymvQaWrI_x56P19ECA/exec';
 
   const state = {
-  busy: false,
-  activeTrips: []
-};
+    busy: false,
+    activeTrips: []
+  };
 
-    const elements = {
-const elements = {
-  backendStatus:
-    document.getElementById('backendStatus'),
+  const elements = {
+    backendStatus:
+      document.getElementById('backendStatus'),
 
-  searchedCount:
-    document.getElementById('searchedCount'),
+    searchedCount:
+      document.getElementById('searchedCount'),
 
-  activeCount:
-    document.getElementById('activeCount'),
+    activeCount:
+      document.getElementById('activeCount'),
 
-  pdfCount:
-    document.getElementById('pdfCount'),
+    pdfCount:
+      document.getElementById('pdfCount'),
 
-  routeModal:
-    document.getElementById('routeModal'),
+    routeModal:
+      document.getElementById('routeModal'),
 
-  routeModalTitle:
-    document.getElementById('routeModalTitle'),
+    routeModalTitle:
+      document.getElementById('routeModalTitle'),
 
-  routeModalBody:
-    document.getElementById('routeModalBody'),
+    routeModalBody:
+      document.getElementById('routeModalBody'),
 
-  syncButton:
-    document.getElementById('syncButton'),
+    syncButton:
+      document.getElementById('syncButton'),
 
-  refreshButton:
-    document.getElementById('refreshButton'),
+    refreshButton:
+      document.getElementById('refreshButton'),
 
-  downloadButton:
-    document.getElementById('downloadButton'),
+    downloadButton:
+      document.getElementById('downloadButton'),
 
-  tripNumberInput:
-    document.getElementById('tripNumberInput'),
+    tripNumberInput:
+      document.getElementById('tripNumberInput'),
 
-  tripTableBody:
-    document.getElementById('tripTableBody'),
+    tripTableBody:
+      document.getElementById('tripTableBody'),
 
-  fileTableBody:
-    document.getElementById('fileTableBody'),
+    fileTableBody:
+      document.getElementById('fileTableBody'),
 
-  logOutput:
-    document.getElementById('logOutput')
-};
-      syncButton: document.getElementById('syncButton'),
-      refreshButton: document.getElementById('refreshButton'),
-      downloadButton: document.getElementById('downloadButton'),
-      tripNumberInput: document.getElementById('tripNumberInput'),
-      tripTableBody: document.getElementById('tripTableBody'),
-      fileTableBody: document.getElementById('fileTableBody'),
-      logOutput: document.getElementById('logOutput')
-    };
+    logOutput:
+      document.getElementById('logOutput')
+  };
 
     function assertConfigured() {
       if (
@@ -742,8 +727,10 @@ const elements = {
           ? data
           : JSON.stringify(data, null, 2);
 
-      elements.logOutput.textContent =
-        '[' + time + '] ' + title + '\n\n' + body;
+      if (elements.logOutput) {
+        elements.logOutput.textContent =
+          '[' + time + '] ' + title + '\n\n' + body;
+      }
     }
 
     /**
@@ -1291,8 +1278,9 @@ function closeRouteModal(event) {
         }
       }
     );
-/* ROUTE 팝업 ESC 키 닫기 */
-document.addEventListener(
+
+    /* ROUTE 팝업 ESC 키 닫기 */
+    document.addEventListener(
   'keydown',
   function (event) {
     if (event.key === 'Escape') {
@@ -1302,6 +1290,7 @@ document.addEventListener(
     }
   }
 );
+
     window.addEventListener(
       'DOMContentLoaded',
       refreshDashboard
