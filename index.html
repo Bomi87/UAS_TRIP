@@ -424,9 +424,18 @@
 }
 
 .route-time {
-  margin-top: 4px;
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.route-time-utc {
+  margin-top: 2px;
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.5;
 }
     .empty {
       padding: 28px;
@@ -675,7 +684,7 @@
     function assertConfigured() {
       if (
         !APPS_SCRIPT_WEB_APP_URL ||
-        APPS_SCRIPT_WEB_APP_URL.includes('여기에_')
+        APPS_SCRIPT_WEB_APP_URL.includes('https://script.google.com/macros/s/AKfycbzcElx-DFlfbn-egutAdTM1G5oFMzkuR0c3DNDJgSOgHP7WMN8klV0eAstIU5PRcbBnDw/exec')
       ) {
         throw new Error(
           'index.html의 APPS_SCRIPT_WEB_APP_URL에 Apps Script 웹 앱 URL을 입력하세요.'
@@ -1041,7 +1050,7 @@
               'onclick="openRouteModal(' +
                 index +
               ')">' +
-              'LEGs' +
+              'ROUTE' +
             '</button>' +
           '</td>' +
 
@@ -1174,11 +1183,34 @@
       const arrival =
         leg.arrivalIcao || '----';
 
-      const departureTime =
-        leg.departureDateTime || '';
+      const departureLocal =
+        leg.departureLocal || '';
 
-      const arrivalTime =
-        leg.arrivalDateTime || '';
+      const arrivalLocal =
+        leg.arrivalLocal || '';
+
+      const departureUtc =
+        leg.departureUtc || '';
+
+      const arrivalUtc =
+        leg.arrivalUtc || '';
+
+      const localText =
+        departureLocal && arrivalLocal
+          ? departureLocal +
+            'L → ' +
+            arrivalLocal +
+            'L'
+          : 'Local Time 정보 없음';
+
+      const utcText =
+        departureUtc && arrivalUtc
+          ? '(' +
+            departureUtc +
+            'Z → ' +
+            arrivalUtc +
+            'Z)'
+          : '';
 
       return (
         '<div class="route-row">' +
@@ -1201,13 +1233,17 @@
 
             '<div class="route-time">' +
               escapeHtml(
-                departureTime
-              ) +
-              ' → ' +
-              escapeHtml(
-                arrivalTime
+                localText
               ) +
             '</div>' +
+
+            (
+              utcText
+                ? '<div class="route-time-utc">' +
+                    escapeHtml(utcText) +
+                  '</div>'
+                : ''
+            ) +
           '</div>' +
 
         '</div>'
