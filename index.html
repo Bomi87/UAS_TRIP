@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="GTMx Flight Document Manager" />
   <meta name="theme-color" content="#0f172a" />
-  <title>GTMx Flight Document Manager</title>
+  <title>GTMx Trip Document Manager</title>
 
   <style>
     :root {
@@ -61,7 +61,7 @@
     .hero {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 20px;
       margin-bottom: 22px;
       padding: 26px 28px;
@@ -476,11 +476,10 @@
       <div>
         <h1>GTMx Flight Document Manager</h1>
         <p>
-          활성 Trip 조회, Flight Document 동기화 및 Google Drive 저장 현황을 확인합니다.
+          활성 Trip 조회, Trip Document 현황을 CHK.
         </p>
       </div>
-      <div class="hero-badge">GitHub Pages</div>
-    </section>
+</section>
 
     <section class="grid">
       <article class="card">
@@ -513,18 +512,14 @@
       </article>
 
       <article class="card half">
-        <h2>자동 동기화</h2>
+        <h2>Flight Document 갱신</h2>
         <p class="card-subtitle">
-          활성 Trip의 최신 Flight Document를 생성하여 Drive 파일을 교체합니다.
+          활성 Trip의 최신 Flight Document를 다시 생성하여 Drive 파일을 갱신합니다.
         </p>
 
         <div class="actions">
           <button class="btn success" id="syncButton" type="button">
-            지금 동기화
-          </button>
-
-          <button class="btn secondary" id="refreshButton" type="button">
-            현황 새로고침
+            새로고침
           </button>
         </div>
       </article>
@@ -677,9 +672,6 @@
     syncButton:
       document.getElementById('syncButton'),
 
-    refreshButton:
-      document.getElementById('refreshButton'),
-
     downloadButton:
       document.getElementById('downloadButton'),
 
@@ -712,7 +704,6 @@
 
       [
         elements.syncButton,
-        elements.refreshButton,
         elements.downloadButton
       ].forEach(function (button) {
         button.disabled = isBusy;
@@ -1032,7 +1023,7 @@
               'onclick="openRouteModal(' +
                 index +
               ')">' +
-              'ROUTE' +
+              'Legs' +
             '</button>' +
           '</td>' +
 
@@ -1254,11 +1245,6 @@ function closeRouteModal(event) {
     function escapeAttribute(value) {
       return escapeHtml(value);
     }
-
-    elements.refreshButton.addEventListener(
-      'click',
-      refreshDashboard
-    );
 
     elements.syncButton.addEventListener(
       'click',
