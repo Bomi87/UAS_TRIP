@@ -530,6 +530,7 @@
 
         <p class="card-subtitle">
           Completed, Cancelled 및 Draft Trip은 표시하지 않습니다.
+          FROM/TO는 출발지·도착지 Local Date 기준이며,
           Status를 누르면 저장된 Flight Document가 열립니다.
         </p>
 
@@ -1034,6 +1035,52 @@
 
   elements.tripTableBody.innerHTML =
     trips.map(function (trip, index) {
+      const legs =
+        Array.isArray(trip.legs)
+          ? trip.legs
+              .slice()
+              .sort(function (a, b) {
+                return Number(a.sequence || 0) -
+                       Number(b.sequence || 0);
+              })
+          : [];
+
+      const firstLeg =
+        legs.length
+          ? legs[0]
+          : null;
+
+      const lastLeg =
+        legs.length
+          ? legs[legs.length - 1]
+          : null;
+
+      const localFromDateTime =
+        firstLeg
+          ? getRouteLocalText(
+              firstLeg.departureDateTime || '',
+              firstLeg.departureIcao || ''
+            )
+          : '';
+
+      const localToDateTime =
+        lastLeg
+          ? getRouteLocalText(
+              lastLeg.arrivalDateTime || '',
+              lastLeg.arrivalIcao || ''
+            )
+          : '';
+
+      const localFromDate =
+        localFromDateTime
+          ? localFromDateTime.slice(0, 10)
+          : (trip.fromDate || '');
+
+      const localToDate =
+        localToDateTime
+          ? localToDateTime.slice(0, 10)
+          : (trip.toDate || '');
+
       return (
         '<tr>' +
 
@@ -1069,13 +1116,13 @@
 
           '<td>' +
             escapeHtml(
-              trip.fromDate || ''
+              localFromDate
             ) +
           '</td>' +
 
           '<td>' +
             escapeHtml(
-              trip.toDate || ''
+              localToDate
             ) +
           '</td>' +
 
@@ -1146,6 +1193,205 @@
     }
 
 
+    /**
+     * ROUTE 표시용 공항별 IANA Time Zone
+     *
+     * GTMx의 leg dateTime은 UTC 기준으로 처리합니다.
+     * Local 시간은 브라우저에서 직접 변환하므로,
+     * 백엔드의 departureLocal/arrivalLocal 값이 없어도 표시됩니다.
+     */
+    const AIRPORT_TIMEZONES = {
+      RKSS: 'Asia/Seoul',
+      RKSI: 'Asia/Seoul',
+      RKPK: 'Asia/Seoul',
+      RKPC: 'Asia/Seoul',
+
+      PANC: 'America/Anchorage',
+
+      KTEB: 'America/New_York',
+      KEWR: 'America/New_York',
+      KJFK: 'America/New_York',
+      KLGA: 'America/New_York',
+      KHPN: 'America/New_York',
+      KISP: 'America/New_York',
+
+      KIAD: 'America/New_York',
+      KDCA: 'America/New_York',
+      KBWI: 'America/New_York',
+
+      KATL: 'America/New_York',
+      KAGS: 'America/New_York',
+      KMIA: 'America/New_York',
+      KFLL: 'America/New_York',
+      KMCO: 'America/New_York',
+
+      KORD: 'America/Chicago',
+      KMDW: 'America/Chicago',
+      KDFW: 'America/Chicago',
+      KDAL: 'America/Chicago',
+      KIAH: 'America/Chicago',
+      KHOU: 'America/Chicago',
+
+      KDEN: 'America/Denver',
+      KSLC: 'America/Denver',
+
+      KSJC: 'America/Los_Angeles',
+      KSFO: 'America/Los_Angeles',
+      KOAK: 'America/Los_Angeles',
+      KLAX: 'America/Los_Angeles',
+      KBFI: 'America/Los_Angeles',
+      KSEA: 'America/Los_Angeles',
+      KLAS: 'America/Los_Angeles',
+
+      PHNL: 'Pacific/Honolulu',
+
+      CYYZ: 'America/Toronto',
+      CYVR: 'America/Vancouver',
+
+      EGLL: 'Europe/London',
+      EGLF: 'Europe/London',
+      EINN: 'Europe/Dublin',
+
+      LFPB: 'Europe/Paris',
+      LFPG: 'Europe/Paris',
+      EBBR: 'Europe/Brussels',
+      EDDF: 'Europe/Berlin',
+      EDDM: 'Europe/Berlin',
+      LSZH: 'Europe/Zurich',
+      LIRF: 'Europe/Rome',
+      LIRN: 'Europe/Rome',
+      LROP: 'Europe/Bucharest',
+
+      OOMS: 'Asia/Muscat',
+      OMDB: 'Asia/Dubai',
+      OMDW: 'Asia/Dubai',
+      OMAA: 'Asia/Dubai',
+      OTBD: 'Asia/Qatar',
+
+      VHHH: 'Asia/Hong_Kong',
+      ZBAA: 'Asia/Shanghai',
+      ZBAD: 'Asia/Shanghai',
+      ZSSS: 'Asia/Shanghai',
+      ZSPD: 'Asia/Shanghai',
+
+      RJTT: 'Asia/Tokyo',
+      RJAA: 'Asia/Tokyo',
+      RJBB: 'Asia/Tokyo',
+
+      VTBS: 'Asia/Bangkok',
+      VTCC: 'Asia/Bangkok',
+
+      VVNB: 'Asia/Ho_Chi_Minh',
+      VVTS: 'Asia/Ho_Chi_Minh',
+
+      WSSS: 'Asia/Singapore',
+
+      WMKK: 'Asia/Kuala_Lumpur',
+
+      VIDP: 'Asia/Kolkata',
+
+      YSSY: 'Australia/Sydney',
+      YMML: 'Australia/Melbourne'
+    };
+
+
+    function parseRouteUtcDateTime(value) {
+      const raw = String(value || '').trim();
+
+      if (!raw) {
+        return null;
+      }
+
+      const normalized =
+        raw
+          .replace(' ', 'T')
+          .replace(
+            /([+-]\d{2}:\d{2}|Z)$/i,
+            ''
+          ) +
+        'Z';
+
+      const date =
+        new Date(normalized);
+
+      return Number.isNaN(date.getTime())
+        ? null
+        : date;
+    }
+
+
+    function formatRouteDateTime(
+      value,
+      timeZone
+    ) {
+      const date =
+        parseRouteUtcDateTime(value);
+
+      if (!date || !timeZone) {
+        return '';
+      }
+
+      const parts =
+        new Intl.DateTimeFormat(
+          'en-CA',
+          {
+            timeZone: timeZone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hourCycle: 'h23'
+          }
+        ).formatToParts(date);
+
+      const values = {};
+
+      parts.forEach(function (part) {
+        values[part.type] =
+          part.value;
+      });
+
+      return (
+        values.year +
+        '-' +
+        values.month +
+        '-' +
+        values.day +
+        ' ' +
+        values.hour +
+        ':' +
+        values.minute
+      );
+    }
+
+
+    function getRouteUtcText(value) {
+      return formatRouteDateTime(
+        value,
+        'UTC'
+      );
+    }
+
+
+    function getRouteLocalText(
+      value,
+      icao
+    ) {
+      const timeZone =
+        AIRPORT_TIMEZONES[
+          String(icao || '')
+            .trim()
+            .toUpperCase()
+        ];
+
+      return formatRouteDateTime(
+        value,
+        timeZone
+      );
+    }
+
+
     function openRouteModal(index) {
   const trip =
     state.activeTrips[index];
@@ -1183,17 +1429,33 @@
       const arrival =
         leg.arrivalIcao || '----';
 
+      const departureRaw =
+        leg.departureDateTime || '';
+
+      const arrivalRaw =
+        leg.arrivalDateTime || '';
+
       const departureLocal =
-        leg.departureLocal || '';
+        getRouteLocalText(
+          departureRaw,
+          departure
+        );
 
       const arrivalLocal =
-        leg.arrivalLocal || '';
+        getRouteLocalText(
+          arrivalRaw,
+          arrival
+        );
 
       const departureUtc =
-        leg.departureUtc || '';
+        getRouteUtcText(
+          departureRaw
+        );
 
       const arrivalUtc =
-        leg.arrivalUtc || '';
+        getRouteUtcText(
+          arrivalRaw
+        );
 
       const localText =
         departureLocal && arrivalLocal
@@ -1201,7 +1463,7 @@
             'L → ' +
             arrivalLocal +
             'L'
-          : 'Local Time 정보 없음';
+          : '';
 
       const utcText =
         departureUtc && arrivalUtc
@@ -1231,11 +1493,13 @@
               escapeHtml(arrival) +
             '</div>' +
 
-            '<div class="route-time">' +
-              escapeHtml(
-                localText
-              ) +
-            '</div>' +
+            (
+              localText
+                ? '<div class="route-time">' +
+                    escapeHtml(localText) +
+                  '</div>'
+                : ''
+            ) +
 
             (
               utcText
