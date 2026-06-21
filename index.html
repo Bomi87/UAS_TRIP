@@ -1114,21 +1114,15 @@
           ? legs[legs.length - 1]
           : null;
 
-      const localFromDateTime =
-        firstLeg
-          ? getRouteLocalText(
-              firstLeg.departureDateTime || '',
-              firstLeg.departureIcao || ''
-            )
-          : '';
+const localFromDateTime =
+  firstLeg
+    ? String(firstLeg.departureLocal || '')
+    : '';
 
-      const localToDateTime =
-        lastLeg
-          ? getRouteLocalText(
-              lastLeg.arrivalDateTime || '',
-              lastLeg.arrivalIcao || ''
-            )
-          : '';
+const localToDateTime =
+  lastLeg
+    ? String(lastLeg.arrivalLocal || '')
+    : '';
 
       const localFromDate =
         localFromDateTime
@@ -1252,208 +1246,17 @@
     }
 
 
-    /**
-     * ROUTE 표시용 공항별 IANA Time Zone
-     *
-     * GTMx의 leg dateTime은 UTC 기준으로 처리합니다.
-     * Local 시간은 브라우저에서 직접 변환하므로,
-     * 백엔드의 departureLocal/arrivalLocal 값이 없어도 표시됩니다.
-     */
-    const AIRPORT_TIMEZONES = {
-      RKSS: 'Asia/Seoul',
-      RKSI: 'Asia/Seoul',
-      RKPK: 'Asia/Seoul',
-      RKPC: 'Asia/Seoul',
-
-      PANC: 'America/Anchorage',
-
-      KTEB: 'America/New_York',
-      KEWR: 'America/New_York',
-      KJFK: 'America/New_York',
-      KLGA: 'America/New_York',
-      KHPN: 'America/New_York',
-      KISP: 'America/New_York',
-
-      KIAD: 'America/New_York',
-      KDCA: 'America/New_York',
-      KBWI: 'America/New_York',
-
-      KATL: 'America/New_York',
-      KAGS: 'America/New_York',
-      KMIA: 'America/New_York',
-      KFLL: 'America/New_York',
-      KMCO: 'America/New_York',
-
-      KORD: 'America/Chicago',
-      KMDW: 'America/Chicago',
-      KDFW: 'America/Chicago',
-      KDAL: 'America/Chicago',
-      KIAH: 'America/Chicago',
-      KHOU: 'America/Chicago',
-
-      KDEN: 'America/Denver',
-      KSLC: 'America/Denver',
-
-      KSJC: 'America/Los_Angeles',
-      KSFO: 'America/Los_Angeles',
-      KOAK: 'America/Los_Angeles',
-      KLAX: 'America/Los_Angeles',
-      KBFI: 'America/Los_Angeles',
-      KSEA: 'America/Los_Angeles',
-      KLAS: 'America/Los_Angeles',
-
-      PHNL: 'Pacific/Honolulu',
-
-      CYYZ: 'America/Toronto',
-      CYVR: 'America/Vancouver',
-
-      EGLL: 'Europe/London',
-      EGLF: 'Europe/London',
-      EINN: 'Europe/Dublin',
-
-      LFPB: 'Europe/Paris',
-      LFPG: 'Europe/Paris',
-      EBBR: 'Europe/Brussels',
-      EDDF: 'Europe/Berlin',
-      EDDM: 'Europe/Berlin',
-      LSZH: 'Europe/Zurich',
-      LIRF: 'Europe/Rome',
-      LIRN: 'Europe/Rome',
-      LROP: 'Europe/Bucharest',
-
-      OOMS: 'Asia/Muscat',
-      OMDB: 'Asia/Dubai',
-      OMDW: 'Asia/Dubai',
-      OMAA: 'Asia/Dubai',
-      OTBD: 'Asia/Qatar',
-
-      VHHH: 'Asia/Hong_Kong',
-      ZBAA: 'Asia/Shanghai',
-      ZBAD: 'Asia/Shanghai',
-      ZSSS: 'Asia/Shanghai',
-      ZSPD: 'Asia/Shanghai',
-
-      RJTT: 'Asia/Tokyo',
-      RJAA: 'Asia/Tokyo',
-      RJBB: 'Asia/Tokyo',
-
-      VTBS: 'Asia/Bangkok',
-      VTCC: 'Asia/Bangkok',
-
-      VVNB: 'Asia/Ho_Chi_Minh',
-      VVTS: 'Asia/Ho_Chi_Minh',
-
-      WSSS: 'Asia/Singapore',
-
-      WMKK: 'Asia/Kuala_Lumpur',
-
-      VIDP: 'Asia/Kolkata',
-
-      YSSY: 'Australia/Sydney',
-      YMML: 'Australia/Melbourne'
-    };
+  
 
 
-    function parseRouteUtcDateTime(value) {
-      const raw = String(value || '').trim();
-
-      if (!raw) {
-        return null;
-      }
-
-      let normalized =
-        raw.replace(' ', 'T');
-
-      const hasTimeZone =
-        /(?:Z|[+-]\d{2}:?\d{2})$/i.test(
-          normalized
-        );
-
-      if (!hasTimeZone) {
-        normalized += 'Z';
-      }
-
-      const date =
-        new Date(normalized);
-
-      return Number.isNaN(date.getTime())
-        ? null
-        : date;
-    }
+   
 
 
-    function formatRouteDateTime(
-      value,
-      timeZone
-    ) {
-      const date =
-        parseRouteUtcDateTime(value);
-
-      if (!date || !timeZone) {
-        return '';
-      }
-
-      const parts =
-        new Intl.DateTimeFormat(
-          'en-CA',
-          {
-            timeZone: timeZone,
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            hourCycle: 'h23'
-          }
-        ).formatToParts(date);
-
-      const values = {};
-
-      parts.forEach(function (part) {
-        values[part.type] =
-          part.value;
-      });
-
-      return (
-        values.year +
-        '-' +
-        values.month +
-        '-' +
-        values.day +
-        ' ' +
-        values.hour +
-        ':' +
-        values.minute
-      );
-    }
+ 
 
 
-    function getRouteUtcText(value) {
-      return formatRouteDateTime(
-        value,
-        'UTC'
-      );
-    }
 
-
-    function getRouteLocalText(
-      value,
-      icao
-    ) {
-      const timeZone =
-        AIRPORT_TIMEZONES[
-          String(icao || '')
-            .trim()
-            .toUpperCase()
-        ];
-
-      return formatRouteDateTime(
-        value,
-        timeZone
-      );
-    }
-
-
+  
     function openRouteModal(index) {
   const trip =
     state.activeTrips[index];
@@ -1491,33 +1294,33 @@
       const arrival =
         leg.arrivalIcao || '----';
 
-      const departureRaw =
-        leg.departureDateTime || '';
+const departureLocal =
+  String(
+    leg.departureLocal ||
+    leg.departureLocalDateTime ||
+    ''
+  );
 
-      const arrivalRaw =
-        leg.arrivalDateTime || '';
+const arrivalLocal =
+  String(
+    leg.arrivalLocal ||
+    leg.arrivalLocalDateTime ||
+    ''
+  );
 
-      const departureLocal =
-        getRouteLocalText(
-          departureRaw,
-          departure
-        );
+const departureUtc =
+  String(
+    leg.departureUtc ||
+    leg.departureDateTime ||
+    ''
+  );
 
-      const arrivalLocal =
-        getRouteLocalText(
-          arrivalRaw,
-          arrival
-        );
-
-      const departureUtc =
-        getRouteUtcText(
-          departureRaw
-        );
-
-      const arrivalUtc =
-        getRouteUtcText(
-          arrivalRaw
-        );
+const arrivalUtc =
+  String(
+    leg.arrivalUtc ||
+    leg.arrivalDateTime ||
+    ''
+  );
 
       const localText =
         departureLocal && arrivalLocal
