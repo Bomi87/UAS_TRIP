@@ -293,7 +293,117 @@
     .link:hover {
       text-decoration: underline;
     }
+.route-button {
+  min-height: 30px;
+  margin-left: 8px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  color: #1d4ed8;
+  background: #dbeafe;
+  font-size: 12px;
+  font-weight: 800;
+}
 
+.route-button:hover {
+  background: #bfdbfe;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.modal-backdrop.open {
+  display: flex;
+}
+
+.route-modal {
+  width: min(520px, 100%);
+  max-height: 85vh;
+  overflow: auto;
+  background: white;
+  border-radius: 18px;
+  box-shadow:
+    0 24px 70px rgba(15, 23, 42, 0.30);
+}
+
+.route-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.route-modal-title {
+  margin: 0;
+  font-size: 19px;
+}
+
+.route-modal-close {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  color: var(--text);
+  background: #e2e8f0;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.route-modal-body {
+  padding: 20px;
+}
+
+.route-list {
+  display: grid;
+  gap: 10px;
+}
+
+.route-row {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+}
+
+.route-sequence {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: white;
+  background: var(--primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.route-airports {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.route-time {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
     .empty {
       padding: 28px;
       color: var(--muted);
@@ -500,7 +610,39 @@
         <pre class="log" id="logOutput">대기 중...</pre>
       </article>
     </section>
+<div
+  class="modal-backdrop"
+  id="routeModal"
+  onclick="closeRouteModal(event)"
+>
+  <div
+    class="route-modal"
+    onclick="event.stopPropagation()"
+  >
+    <div class="route-modal-head">
+      <h3
+        class="route-modal-title"
+        id="routeModalTitle"
+      >
+        Trip Route
+      </h3>
 
+      <button
+        class="route-modal-close"
+        type="button"
+        onclick="closeRouteModal()"
+        aria-label="닫기"
+      >
+        ×
+      </button>
+    </div>
+
+    <div
+      class="route-modal-body"
+      id="routeModalBody"
+    ></div>
+  </div>
+</div>
     <footer class="footer">
       로그인 정보와 GTMx Token은 GitHub에 저장하지 않습니다.
     </footer>
@@ -509,17 +651,57 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbyKSwvq-sPu4nlxpo4yxaFChUJeiNa1PN6aZcrQQpdvfnky2HBcezZD5buuyoyTnF2WQw/exec';
+      'https://script.google.com/macros/s/AKfycbyfPIydE-MfT8tvnXRlrcc2COgHiTuSfhXbdsvdmZpO1b-YaK1WymvQaWrI_x56P19ECA/exec';
 
-    const state = {
-      busy: false
-    };
+  const state = {
+  busy: false,
+  activeTrips: []
+};
 
     const elements = {
-      backendStatus: document.getElementById('backendStatus'),
-      searchedCount: document.getElementById('searchedCount'),
-      activeCount: document.getElementById('activeCount'),
-      pdfCount: document.getElementById('pdfCount'),
+const elements = {
+  backendStatus:
+    document.getElementById('backendStatus'),
+
+  searchedCount:
+    document.getElementById('searchedCount'),
+
+  activeCount:
+    document.getElementById('activeCount'),
+
+  pdfCount:
+    document.getElementById('pdfCount'),
+
+  routeModal:
+    document.getElementById('routeModal'),
+
+  routeModalTitle:
+    document.getElementById('routeModalTitle'),
+
+  routeModalBody:
+    document.getElementById('routeModalBody'),
+
+  syncButton:
+    document.getElementById('syncButton'),
+
+  refreshButton:
+    document.getElementById('refreshButton'),
+
+  downloadButton:
+    document.getElementById('downloadButton'),
+
+  tripNumberInput:
+    document.getElementById('tripNumberInput'),
+
+  tripTableBody:
+    document.getElementById('tripTableBody'),
+
+  fileTableBody:
+    document.getElementById('fileTableBody'),
+
+  logOutput:
+    document.getElementById('logOutput')
+};
       syncButton: document.getElementById('syncButton'),
       refreshButton: document.getElementById('refreshButton'),
       downloadButton: document.getElementById('downloadButton'),
@@ -663,20 +845,27 @@
       return result;
     }
 
-    async function loadTrips() {
-      const result = await callBackend('trips');
+  async function loadTrips() {
+  const result =
+    await callBackend('trips');
 
-      elements.searchedCount.textContent =
-        result.searchedTripCount ?? '-';
+  elements.searchedCount.textContent =
+    result.searchedTripCount ?? '-';
 
-      elements.activeCount.textContent =
-        result.activeTripCount ?? '-';
+  elements.activeCount.textContent =
+    result.activeTripCount ?? '-';
 
-      renderTrips(result.activeTrips || []);
+  state.activeTrips =
+    Array.isArray(result.activeTrips)
+      ? result.activeTrips
+      : [];
 
-      return result;
-    }
+  renderTrips(
+    state.activeTrips
+  );
 
+  return result;
+}
     async function loadFiles() {
       const result = await callBackend('list');
 
@@ -828,40 +1017,171 @@
       }
     }
 
-    function renderTrips(trips) {
-      if (!trips.length) {
-        elements.tripTableBody.innerHTML =
-          '<tr><td colspan="5" class="empty">' +
-          '현재 활성 Trip이 없습니다.' +
-          '</td></tr>';
+   function renderTrips(trips) {
+  if (!trips.length) {
+    elements.tripTableBody.innerHTML =
+      '<tr><td colspan="5" class="empty">' +
+      '현재 활성 Trip이 없습니다.' +
+      '</td></tr>';
 
-        return;
-      }
+    return;
+  }
 
-      elements.tripTableBody.innerHTML =
-        trips.map(function (trip) {
-          return (
-            '<tr>' +
-              '<td><strong>' +
-                escapeHtml(trip.tripNumber || '') +
-              '</strong></td>' +
-              '<td><span class="status-pill active">' +
-                escapeHtml(trip.status || '') +
-              '</span></td>' +
-              '<td>' +
-                escapeHtml(trip.fromDate || '') +
-              '</td>' +
-              '<td>' +
-                escapeHtml(trip.toDate || '') +
-              '</td>' +
-              '<td>' +
-                escapeHtml(String(trip.legCount ?? '')) +
-              '</td>' +
-            '</tr>'
-          );
-        }).join('');
-    }
+  elements.tripTableBody.innerHTML =
+    trips.map(function (trip, index) {
+      return (
+        '<tr>' +
 
+          '<td>' +
+            '<strong>' +
+              escapeHtml(
+                trip.tripNumber || ''
+              ) +
+            '</strong>' +
+
+            '<button ' +
+              'class="route-button" ' +
+              'type="button" ' +
+              'onclick="openRouteModal(' +
+                index +
+              ')">' +
+              'ROUTE' +
+            '</button>' +
+          '</td>' +
+
+          '<td>' +
+            '<span class="status-pill active">' +
+              escapeHtml(
+                trip.status || ''
+              ) +
+            '</span>' +
+          '</td>' +
+
+          '<td>' +
+            escapeHtml(
+              trip.fromDate || ''
+            ) +
+          '</td>' +
+
+          '<td>' +
+            escapeHtml(
+              trip.toDate || ''
+            ) +
+          '</td>' +
+
+          '<td>' +
+            escapeHtml(
+              String(
+                trip.legCount ?? ''
+              )
+            ) +
+          '</td>' +
+
+        '</tr>'
+      );
+    }).join('');
+}
+
+    function openRouteModal(index) {
+  const trip =
+    state.activeTrips[index];
+
+  if (!trip) {
+    return;
+  }
+
+  const legs =
+    Array.isArray(trip.legs)
+      ? trip.legs
+      : [];
+
+  elements.routeModalTitle.textContent =
+    trip.tripNumber + ' ROUTE';
+
+  if (!legs.length) {
+    elements.routeModalBody.innerHTML =
+      '<div class="empty">' +
+      'Route 정보가 없습니다.' +
+      '</div>';
+
+    elements.routeModal.classList.add(
+      'open'
+    );
+
+    return;
+  }
+
+  const routeHtml =
+    legs.map(function (leg, index) {
+      const departure =
+        leg.departureIcao || '----';
+
+      const arrival =
+        leg.arrivalIcao || '----';
+
+      const departureTime =
+        leg.departureDateTime || '';
+
+      const arrivalTime =
+        leg.arrivalDateTime || '';
+
+      return (
+        '<div class="route-row">' +
+
+          '<div class="route-sequence">' +
+            escapeHtml(
+              String(
+                leg.sequence ||
+                index + 1
+              )
+            ) +
+          '</div>' +
+
+          '<div>' +
+            '<div class="route-airports">' +
+              escapeHtml(departure) +
+              ' - ' +
+              escapeHtml(arrival) +
+            '</div>' +
+
+            '<div class="route-time">' +
+              escapeHtml(
+                departureTime
+              ) +
+              ' → ' +
+              escapeHtml(
+                arrivalTime
+              ) +
+            '</div>' +
+          '</div>' +
+
+        '</div>'
+      );
+    }).join('');
+
+  elements.routeModalBody.innerHTML =
+    '<div class="route-list">' +
+      routeHtml +
+    '</div>';
+
+  elements.routeModal.classList.add(
+    'open'
+  );
+}
+
+
+function closeRouteModal(event) {
+  if (
+    event &&
+    event.target !== elements.routeModal
+  ) {
+    return;
+  }
+
+  elements.routeModal.classList.remove(
+    'open'
+  );
+}
     function renderFiles(files) {
       if (!files.length) {
         elements.fileTableBody.innerHTML =
@@ -971,7 +1291,17 @@
         }
       }
     );
-
+/* ROUTE 팝업 ESC 키 닫기 */
+document.addEventListener(
+  'keydown',
+  function (event) {
+    if (event.key === 'Escape') {
+      elements.routeModal.classList.remove(
+        'open'
+      );
+    }
+  }
+);
     window.addEventListener(
       'DOMContentLoaded',
       refreshDashboard
