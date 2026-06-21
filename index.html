@@ -509,7 +509,7 @@
       <div>
         <h1>GTMx Flight Document Manager</h1>
         <p>
-          앱을 열면 활성 Trip의 Flight Document를 자동으로 갱신합니다.
+          앱을 열면 Active Trip의 Flight Document를 자동으로 갱신합니다.
         </p>
       </div>
 </section>
@@ -517,7 +517,7 @@
     <section class="grid">
       <article class="card">
         <div class="card-header-row">
-          <h2>활성 Trip</h2>
+          <h2>Active Trip</h2>
 
           <button
             class="btn success"
@@ -529,9 +529,9 @@
         </div>
 
         <p class="card-subtitle">
-          Completed, Cancelled 및 Draft Trip은 표시하지 않습니다.
-          FROM/TO는 출발지·도착지 Local Date 기준이며,
-          Status를 누르면 저장된 Flight Document가 열립니다.
+          Completed, Cancelled 및 Draft Trip은 미표시
+          Local Date 기준이며,
+          Status를 누르면 저장된 Flight Document가 Open
         </p>
 
         <div class="table-wrap">
@@ -557,7 +557,7 @@
       <article class="card">
         <h2>저장된 PDF</h2>
         <p class="card-subtitle">
-          GTMx_Trip_Documents 폴더에 저장된 PDF 목록입니다.
+          GTMx_Trip_Documents 폴더에 저장된 PDF 목록.
         </p>
 
         <div class="table-wrap">
@@ -583,7 +583,7 @@
       <article class="card">
         <h2>Trip 수동 다운로드</h2>
         <p class="card-subtitle">
-          Trip Number를 입력하면 해당 Flight Document를 Drive에 저장합니다.
+          Trip Number를 입력하면 해당 Trip Document를 Loading.
         </p>
 
         <div class="input-row">
@@ -870,7 +870,7 @@
     /**
      * 앱을 열 때 자동 실행
      *
-     * 활성 Trip의 최신 Flight Document를 동기화하고
+     * Active Trip의 최신 Flight Document를 동기화하고
      * Trip 및 저장 PDF 목록을 다시 불러옵니다.
      * 확인창과 완료 알림은 표시하지 않습니다.
      */
@@ -924,7 +924,7 @@
       }
 
       const confirmed = window.confirm(
-        '활성 Trip의 최신 PDF를 지금 동기화할까요?'
+        'Active Trip의 최신 PDF를 지금 동기화할까요?'
       );
 
       if (!confirmed) {
@@ -1027,7 +1027,7 @@
   if (!trips.length) {
     elements.tripTableBody.innerHTML =
       '<tr><td colspan="5" class="empty">' +
-      '현재 활성 Trip이 없습니다.' +
+      '현재 Active Trip이 없습니다.' +
       '</td></tr>';
 
     return;
