@@ -504,6 +504,19 @@
 </head>
 
 <body>
+  <div id="authScreen" style="
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background:#f3f6fb;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',Arial,sans-serif;
+  ">
+    승인 확인 중...
+  </div>
+
+  <div id="appRoot" style="display:none;">
   <main class="app-shell">
     <section class="hero">
       <div>
@@ -641,11 +654,14 @@
       로그인 정보와 GTMx Token은 GitHub에 저장하지 않습니다.
     </footer>
   </main>
+  </div>
 
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
       'https://script.google.com/macros/s/AKfycbzcElx-DFlfbn-egutAdTM1G5oFMzkuR0c3DNDJgSOgHP7WMN8klV0eAstIU5PRcbBnDw/exec';
+
+  let GTMX_APP_STARTED = false;
 
   const state = {
     busy: false,
@@ -1668,10 +1684,42 @@ function closeRouteModal(event) {
   }
 );
 
-    window.addEventListener(
-      'DOMContentLoaded',
-      autoSyncOnLoad
-    );
+    function startGtmxAppAfterAuth() {
+      if (GTMX_APP_STARTED) {
+        return;
+      }
+
+      GTMX_APP_STARTED = true;
+      autoSyncOnLoad();
+    }
+
+    (function waitForPortalAuth() {
+      // 포털에서 이미 승인된 세션이면 앱 시작
+      if (
+        sessionStorage.getItem('portalApproved') === 'true'
+      ) {
+        startGtmxAppAfterAuth();
+      }
+
+      // common-auth.js가 최종 승인 확인한 경우 통과
+      if (window.CURRENT_PORTAL_USER) {
+        sessionStorage.setItem(
+          'portalApproved',
+          'true'
+        );
+
+        startGtmxAppAfterAuth();
+        return;
+      }
+
+      window.setTimeout(
+        waitForPortalAuth,
+        200
+      );
+    })();
   </script>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://bomi87.github.io/SK-Aviation-portal/common-auth.js"></script>
 </body>
 </html>
