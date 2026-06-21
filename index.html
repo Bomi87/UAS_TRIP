@@ -500,7 +500,7 @@
       <div>
         <h1>GTMx Flight Document Manager</h1>
         <p>
-          활성 Trip 조회 및 Flight Document 현황을 확인합니다.
+          앱을 열면 활성 Trip의 Flight Document를 자동으로 갱신합니다.
         </p>
       </div>
 </section>
@@ -856,6 +856,57 @@
         setBusy(false);
       }
     }
+
+    /**
+     * 앱을 열 때 자동 실행
+     *
+     * 활성 Trip의 최신 Flight Document를 동기화하고
+     * Trip 및 저장 PDF 목록을 다시 불러옵니다.
+     * 확인창과 완료 알림은 표시하지 않습니다.
+     */
+    async function autoSyncOnLoad() {
+      if (state.busy) {
+        return;
+      }
+
+      setBusy(true);
+
+      try {
+        writeLog('앱 시작 자동 동기화', {
+          action: 'sync'
+        });
+
+        const result =
+          await callBackend('sync');
+
+        writeLog(
+          '앱 시작 자동 동기화 완료',
+          result
+        );
+
+        await Promise.all([
+          loadTrips(),
+          loadFiles()
+        ]);
+
+      } catch (error) {
+        writeLog(
+          '앱 시작 자동 동기화 실패',
+          {
+            error: error.message
+          }
+        );
+
+        alert(
+          '자동 새로고침 중 오류가 발생했습니다.\n' +
+          error.message
+        );
+
+      } finally {
+        setBusy(false);
+      }
+    }
+
 
     async function runSync() {
       if (state.busy) {
@@ -1305,7 +1356,7 @@ function closeRouteModal(event) {
 
     window.addEventListener(
       'DOMContentLoaded',
-      refreshDashboard
+      autoSyncOnLoad
     );
   </script>
 </body>
