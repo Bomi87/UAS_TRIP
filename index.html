@@ -383,7 +383,7 @@
 
 .route-row {
   display: grid;
-  grid-template-columns: 36px 1fr;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 13px 14px;
@@ -406,12 +406,14 @@
 }
 
 .route-airports {
+  display: block;
   font-size: 17px;
   font-weight: 800;
   letter-spacing: 0.02em;
 }
 
 .route-time {
+  display: block;
   margin-top: 6px;
   color: var(--text);
   font-size: 13px;
@@ -420,10 +422,130 @@
 }
 
 .route-time-utc {
+  display: block;
   margin-top: 2px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.route-item {
+  display: grid;
+  gap: 8px;
+}
+
+.route-row-button {
+  width: 100%;
+  border: 1px solid var(--line);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.route-row-button:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+
+.route-row-button.open {
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
+
+.route-row-main {
+  min-width: 0;
+}
+
+.route-row-side {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.route-update-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: #1d4ed8;
+  background: #dbeafe;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.route-chevron {
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+
+.route-row-button.open .route-chevron {
+  transform: rotate(180deg);
+}
+
+.leg-updates {
+  display: none;
+  padding: 2px 4px 8px 46px;
+}
+
+.leg-updates.open {
+  display: block;
+}
+
+.leg-update-list {
+  display: grid;
+  gap: 8px;
+}
+
+.leg-update-card {
+  padding: 11px 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.leg-update-location {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.leg-update-title {
+  margin-top: 4px;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.leg-update-time {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.leg-update-empty {
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  background: #ffffff;
+  font-size: 12px;
+  text-align: center;
 }
     .empty {
       padding: 28px;
@@ -686,14 +808,15 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbzcElx-DFlfbn-egutAdTM1G5oFMzkuR0c3DNDJgSOgHP7WMN8klV0eAstIU5PRcbBnDw/exec';
+      'https://script.google.com/macros/s/AKfycbxOHFZeYNgZOblmmSt9wklFeVxZdsNC_mrZ7bqEF7yj1X3fJSrjb-vfh0R0QeLu4ihwHQ/exec';
 
   let GTMX_APP_STARTED = false;
 
   const state = {
     busy: false,
     activeTrips: [],
-    files: []
+    files: [],
+    notifications: []
   };
 
   const elements = {
@@ -884,6 +1007,18 @@
       return result;
     }
 
+    async function loadNotifications() {
+      const result =
+        await callBackend('notifications');
+
+      state.notifications =
+        Array.isArray(result.notifications)
+          ? result.notifications
+          : [];
+
+      return result;
+    }
+
     async function refreshDashboard() {
       if (state.busy) {
         return;
@@ -893,12 +1028,13 @@
 
       try {
         writeLog('현황 조회 시작', {
-          actions: ['trips', 'list']
+          actions: ['trips', 'list', 'notifications']
         });
 
         const results = await Promise.all([
           loadTrips(),
-          loadFiles()
+          loadFiles(),
+          loadNotifications()
         ]);
 
         writeLog('현황 조회 완료', results);
@@ -952,7 +1088,8 @@
 
         await Promise.all([
           loadTrips(),
-          loadFiles()
+          loadFiles(),
+          loadNotifications()
         ]);
 
       } catch (error) {
@@ -1197,9 +1334,434 @@ const localToDateTime =
 
 
   
-    function openRouteModal(index) {
+    function cleanNotificationTitle(value) {
+  return String(value || '')
+    .replace(
+      /\s*-\s*undefined\/undefined\s*$/i,
+      ''
+    )
+    .replace(
+      /\s*-\s*(?:\d+\s*-\s*)?[A-Z0-9]{3,4}\/[A-Z0-9]{3,4}\s*$/i,
+      ''
+    )
+    .trim();
+}
+
+
+function parseNotificationTitle(value) {
+  const original =
+    String(value || '').trim();
+
+  const cleanedUndefined =
+    original.replace(
+      /\s*-\s*undefined\/undefined\s*$/i,
+      ''
+    );
+
+  const stationMatch =
+    cleanedUndefined.match(
+      /\s*-\s*(?:(\d+)\s*-\s*)?([A-Z0-9]{3,4})\/([A-Z0-9]{3,4})\s*$/i
+    );
+
+  const sequenceHint =
+    stationMatch && stationMatch[1]
+      ? Number(stationMatch[1])
+      : null;
+
+  const airportIcao =
+    stationMatch && stationMatch[2]
+      ? stationMatch[2].toUpperCase()
+      : '';
+
+  const withoutStation =
+    stationMatch
+      ? cleanedUndefined.slice(
+          0,
+          stationMatch.index
+        ).trim()
+      : cleanedUndefined.trim();
+
+  const statusMatch =
+    withoutStation.match(
+      /\s+(In Progress|Confirmed|Cancelled|Canceled|Completed|Pending|Rejected|Failed)$/i
+    );
+
+  const status =
+    statusMatch
+      ? statusMatch[1]
+      : '';
+
+  const serviceName =
+    statusMatch
+      ? withoutStation.slice(
+          0,
+          statusMatch.index
+        ).trim()
+      : withoutStation;
+
+  return {
+    original: original,
+    displayTitle: withoutStation,
+    serviceName: serviceName,
+    serviceKey:
+      serviceName
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toUpperCase(),
+    status: status,
+    airportIcao: airportIcao,
+    sequenceHint: sequenceHint
+  };
+}
+
+
+function isFlightPlanUpdate(parsed) {
+  const service =
+    String(
+      parsed && parsed.serviceName
+        ? parsed.serviceName
+        : ''
+    ).toUpperCase();
+
+  return (
+    service.includes(
+      'OPERATIONAL FLIGHT PACKAGE'
+    ) ||
+    service.includes(
+      'TEST FLIGHT PLAN'
+    ) ||
+    service === 'FLIGHT PLAN'
+  );
+}
+
+
+function getNotificationTimeValue(item) {
+  const value =
+    new Date(
+      item && item.createdAt
+        ? item.createdAt
+        : 0
+    ).getTime();
+
+  return Number.isFinite(value)
+    ? value
+    : 0;
+}
+
+
+function formatNotificationUtcForDisplay(item) {
+  const supplied =
+    String(
+      item && item.createdAtUtc
+        ? item.createdAtUtc
+        : ''
+    ).trim();
+
+  if (supplied) {
+    return supplied + 'Z';
+  }
+
+  const date =
+    new Date(
+      item && item.createdAt
+        ? item.createdAt
+        : ''
+    );
+
+  if (isNaN(date.getTime())) {
+    return '';
+  }
+
+  const year =
+    date.getUTCFullYear();
+
+  const month =
+    String(
+      date.getUTCMonth() + 1
+    ).padStart(2, '0');
+
+  const day =
+    String(
+      date.getUTCDate()
+    ).padStart(2, '0');
+
+  const hour =
+    String(
+      date.getUTCHours()
+    ).padStart(2, '0');
+
+  const minute =
+    String(
+      date.getUTCMinutes()
+    ).padStart(2, '0');
+
+  return (
+    year + '-' +
+    month + '-' +
+    day + ' ' +
+    hour + ':' +
+    minute + 'Z'
+  );
+}
+
+
+function getLegUpdates(trip, leg) {
+  const tripNumber =
+    String(
+      trip && trip.tripNumber
+        ? trip.tripNumber
+        : ''
+    )
+      .trim()
+      .toUpperCase();
+
+  const departure =
+    String(
+      leg && leg.departureIcao
+        ? leg.departureIcao
+        : ''
+    )
+      .trim()
+      .toUpperCase();
+
+  const arrival =
+    String(
+      leg && leg.arrivalIcao
+        ? leg.arrivalIcao
+        : ''
+    )
+      .trim()
+      .toUpperCase();
+
+  const legSequence =
+    Number(
+      leg && leg.sequence
+        ? leg.sequence
+        : 0
+    );
+
+  const latestMap = {};
+
+  state.notifications.forEach(function (
+    notification
+  ) {
+    const notificationTrip =
+      String(
+        notification.tripNumber ||
+        notification.description ||
+        ''
+      )
+        .replace(/^Trip\s+/i, '')
+        .trim()
+        .toUpperCase();
+
+    if (
+      !tripNumber ||
+      notificationTrip !== tripNumber
+    ) {
+      return;
+    }
+
+    const parsed =
+      parseNotificationTitle(
+        notification.originalTitle ||
+        notification.title
+      );
+
+    if (!parsed.airportIcao) {
+      return;
+    }
+
+    if (
+      parsed.sequenceHint &&
+      legSequence &&
+      parsed.sequenceHint !== legSequence
+    ) {
+      return;
+    }
+
+    if (
+      parsed.airportIcao !== departure &&
+      parsed.airportIcao !== arrival
+    ) {
+      return;
+    }
+
+    const flightPlan =
+      isFlightPlanUpdate(parsed);
+
+    const locationLabel =
+      flightPlan
+        ? departure + ' - ' + arrival
+        : parsed.airportIcao;
+
+    const key =
+      flightPlan
+        ? [
+            'FLIGHT',
+            parsed.serviceKey
+          ].join('|')
+        : [
+            'GROUND',
+            parsed.airportIcao,
+            parsed.serviceKey
+          ].join('|');
+
+    const normalized = {
+      id:
+        notification.id || '',
+
+      locationLabel:
+        locationLabel,
+
+      title:
+        parsed.displayTitle ||
+        cleanNotificationTitle(
+          notification.title
+        ),
+
+      serviceName:
+        parsed.serviceName,
+
+      status:
+        parsed.status,
+
+      createdAt:
+        notification.createdAt || '',
+
+      createdAtUtc:
+        formatNotificationUtcForDisplay(
+          notification
+        ),
+
+      airportIcao:
+        parsed.airportIcao,
+
+      isFlightPlan:
+        flightPlan
+    };
+
+    const current =
+      latestMap[key];
+
+    if (
+      !current ||
+      getNotificationTimeValue(
+        normalized
+      ) >
+      getNotificationTimeValue(
+        current
+      )
+    ) {
+      latestMap[key] = normalized;
+    }
+  });
+
+  return Object.keys(latestMap)
+    .map(function (key) {
+      return latestMap[key];
+    })
+    .sort(function (a, b) {
+      return (
+        getNotificationTimeValue(b) -
+        getNotificationTimeValue(a)
+      );
+    });
+}
+
+
+function renderLegUpdates(updates) {
+  if (!updates.length) {
+    return (
+      '<div class="leg-update-empty">' +
+        '해당 LEG의 Trip Update가 없습니다.' +
+      '</div>'
+    );
+  }
+
+  return (
+    '<div class="leg-update-list">' +
+      updates.map(function (update) {
+        return (
+          '<div class="leg-update-card">' +
+
+            '<div class="leg-update-location">' +
+              escapeHtml(
+                update.locationLabel || ''
+              ) +
+            '</div>' +
+
+            '<div class="leg-update-title">' +
+              escapeHtml(
+                update.title || ''
+              ) +
+            '</div>' +
+
+            (
+              update.createdAtUtc
+                ? '<div class="leg-update-time">' +
+                    escapeHtml(
+                      update.createdAtUtc
+                    ) +
+                  '</div>'
+                : ''
+            ) +
+
+          '</div>'
+        );
+      }).join('') +
+    '</div>'
+  );
+}
+
+
+function toggleLegUpdates(
+  tripIndex,
+  legIndex
+) {
+  const panel =
+    document.getElementById(
+      'legUpdates-' +
+      tripIndex +
+      '-' +
+      legIndex
+    );
+
+  const button =
+    document.getElementById(
+      'legButton-' +
+      tripIndex +
+      '-' +
+      legIndex
+    );
+
+  if (!panel || !button) {
+    return;
+  }
+
+  const willOpen =
+    !panel.classList.contains('open');
+
+  panel.classList.toggle(
+    'open',
+    willOpen
+  );
+
+  button.classList.toggle(
+    'open',
+    willOpen
+  );
+
+  button.setAttribute(
+    'aria-expanded',
+    willOpen ? 'true' : 'false'
+  );
+}
+
+
+function openRouteModal(tripIndex) {
   const trip =
-    state.activeTrips[index];
+    state.activeTrips[tripIndex];
 
   if (!trip) {
     return;
@@ -1227,40 +1789,40 @@ const localToDateTime =
   }
 
   const routeHtml =
-    legs.map(function (leg, index) {
+    legs.map(function (leg, legIndex) {
       const departure =
         leg.departureIcao || '----';
 
       const arrival =
         leg.arrivalIcao || '----';
 
-const departureLocal =
-  String(
-    leg.departureLocal ||
-    leg.departureLocalDateTime ||
-    ''
-  );
+      const departureLocal =
+        String(
+          leg.departureLocal ||
+          leg.departureLocalDateTime ||
+          ''
+        );
 
-const arrivalLocal =
-  String(
-    leg.arrivalLocal ||
-    leg.arrivalLocalDateTime ||
-    ''
-  );
+      const arrivalLocal =
+        String(
+          leg.arrivalLocal ||
+          leg.arrivalLocalDateTime ||
+          ''
+        );
 
-const departureUtc =
-  String(
-    leg.departureUtc ||
-    leg.departureDateTime ||
-    ''
-  );
+      const departureUtc =
+        String(
+          leg.departureUtc ||
+          leg.departureDateTime ||
+          ''
+        );
 
-const arrivalUtc =
-  String(
-    leg.arrivalUtc ||
-    leg.arrivalDateTime ||
-    ''
-  );
+      const arrivalUtc =
+        String(
+          leg.arrivalUtc ||
+          leg.arrivalDateTime ||
+          ''
+        );
 
       const localText =
         departureLocal && arrivalLocal
@@ -1279,40 +1841,99 @@ const arrivalUtc =
             'Z)'
           : '';
 
+      const updates =
+        getLegUpdates(
+          trip,
+          leg
+        );
+
+      const buttonId =
+        'legButton-' +
+        tripIndex +
+        '-' +
+        legIndex;
+
+      const panelId =
+        'legUpdates-' +
+        tripIndex +
+        '-' +
+        legIndex;
+
       return (
-        '<div class="route-row">' +
+        '<div class="route-item">' +
 
-          '<div class="route-sequence">' +
-            escapeHtml(
-              String(
-                leg.sequence ||
-                index + 1
-              )
-            ) +
-          '</div>' +
+          '<button ' +
+            'class="route-row route-row-button" ' +
+            'id="' +
+              escapeAttribute(buttonId) +
+            '" ' +
+            'type="button" ' +
+            'aria-expanded="false" ' +
+            'onclick="toggleLegUpdates(' +
+              tripIndex +
+              ',' +
+              legIndex +
+            ')">' +
 
-          '<div>' +
-            '<div class="route-airports">' +
-              escapeHtml(departure) +
-              ' - ' +
-              escapeHtml(arrival) +
-            '</div>' +
+            '<span class="route-sequence">' +
+              escapeHtml(
+                String(
+                  leg.sequence ||
+                  legIndex + 1
+                )
+              ) +
+            '</span>' +
 
-            (
-              localText
-                ? '<div class="route-time">' +
-                    escapeHtml(localText) +
-                  '</div>'
-                : ''
-            ) +
+            '<span class="route-row-main">' +
 
-            (
-              utcText
-                ? '<div class="route-time-utc">' +
-                    escapeHtml(utcText) +
-                  '</div>'
-                : ''
-            ) +
+              '<span class="route-airports">' +
+                escapeHtml(departure) +
+                ' - ' +
+                escapeHtml(arrival) +
+              '</span>' +
+
+              (
+                localText
+                  ? '<span class="route-time">' +
+                      escapeHtml(localText) +
+                    '</span>'
+                  : ''
+              ) +
+
+              (
+                utcText
+                  ? '<span class="route-time-utc">' +
+                      escapeHtml(utcText) +
+                    '</span>'
+                  : ''
+              ) +
+
+            '</span>' +
+
+            '<span class="route-row-side">' +
+
+              (
+                updates.length
+                  ? '<span class="route-update-count">' +
+                      escapeHtml(
+                        String(updates.length)
+                      ) +
+                    '</span>'
+                  : ''
+              ) +
+
+              '<span class="route-chevron">⌄</span>' +
+
+            '</span>' +
+
+          '</button>' +
+
+          '<div ' +
+            'class="leg-updates" ' +
+            'id="' +
+              escapeAttribute(panelId) +
+            '">' +
+              renderLegUpdates(updates) +
           '</div>' +
 
         '</div>'
