@@ -531,6 +531,19 @@
   line-height: 1.4;
 }
 
+.leg-update-title.confirmed {
+  color: #15803d;
+}
+
+.leg-update-title.in-progress {
+  color: #c2410c;
+}
+
+.aircraft-registration {
+  white-space: nowrap;
+  font-weight: 800;
+}
+
 .leg-update-time {
   margin-top: 4px;
   color: var(--muted);
@@ -701,6 +714,7 @@
             <thead>
               <tr>
                 <th>Trip Number</th>
+                <th>A/C</th>
                 <th>Status</th>
                 <th>From</th>
                 <th>To</th>
@@ -709,7 +723,7 @@
             </thead>
             <tbody id="tripTableBody">
               <tr>
-                <td colspan="5" class="empty">조회 전입니다.</td>
+                <td colspan="6" class="empty">조회 전입니다.</td>
               </tr>
             </tbody>
           </table>
@@ -808,7 +822,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbwGJ55bMR4hgrTb8qoMioDzp7mTk77Z_IaCUwrPpFNPh8hzV49HuxiS3H3ziKAY0yDQoQ/exec';
+      'https://script.google.com/macros/s/AKfycbwEPVgcQvk44tI2PKe1phYex1zVHZfltlrnxOxDnvOZRDJO7D0d_jSHbl-h889sEFrZVQ/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -1220,7 +1234,7 @@ async function loadNotifications(
    function renderTrips(trips) {
   if (!trips.length) {
     elements.tripTableBody.innerHTML =
-      '<tr><td colspan="5" class="empty">' +
+      '<tr><td colspan="6" class="empty">' +
       '현재 Active Trip이 없습니다.' +
       '</td></tr>';
 
@@ -1287,6 +1301,14 @@ const localToDateTime =
               ')">' +
               'ROUTE' +
             '</button>' +
+          '</td>' +
+
+          '<td>' +
+            '<strong class="aircraft-registration">' +
+              escapeHtml(
+                trip.aircraftRegistration || '-'
+              ) +
+            '</strong>' +
           '</td>' +
 
           '<td>' +
@@ -1747,6 +1769,24 @@ if (
 }
 
 
+function getNotificationTitleClass(
+  title
+) {
+  const text =
+    String(title || '').trim();
+
+  if (/\bConfirmed$/i.test(text)) {
+    return ' confirmed';
+  }
+
+  if (/\bIn Progress$/i.test(text)) {
+    return ' in-progress';
+  }
+
+  return '';
+}
+
+
 function renderLegUpdates(updates) {
   if (!updates.length) {
     return (
@@ -1768,7 +1808,11 @@ function renderLegUpdates(updates) {
               ) +
             '</div>' +
 
-            '<div class="leg-update-title">' +
+            '<div class="leg-update-title' +
+              getNotificationTitleClass(
+                update.title
+              ) +
+            '">' +
               escapeHtml(
                 update.title || ''
               ) +
