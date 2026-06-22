@@ -924,7 +924,7 @@
           reject(
             new Error('Apps Script 응답 시간이 초과되었습니다.')
           );
-        }, 120000);
+        }, 180000);
 
         function cleanup() {
           window.clearTimeout(timeout);
@@ -1684,6 +1684,15 @@ function renderLegUpdates(updates) {
     return (
       '<div class="leg-update-empty">' +
         '해당 LEG의 Trip Update가 없습니다.' +
+        (
+          Array.isArray(state.notifications)
+            ? '<br><small>Loaded notifications: ' +
+                escapeHtml(
+                  String(state.notifications.length)
+                ) +
+              '</small>'
+            : ''
+        ) +
       '</div>'
     );
   }
@@ -1768,7 +1777,7 @@ function toggleLegUpdates(
 }
 
 
-function openRouteModal(tripIndex) {
+async function openRouteModal(tripIndex) {
   const trip =
     state.activeTrips[tripIndex];
 
@@ -1776,23 +1785,59 @@ function openRouteModal(tripIndex) {
     return;
   }
 
+  elements.routeModalTitle.textContent =
+    trip.tripNumber + ' ROUTE';
+
+  elements.routeModal.classList.add(
+    'open'
+  );
+
+  /*
+   * 초기 화면 조회가 끝나기 전에 ROUTE를 눌렀거나
+   * Notification 호출이 누락된 경우 여기서 다시 조회합니다.
+   */
+  if (!Array.isArray(state.notifications) ||
+      state.notifications.length === 0) {
+    elements.routeModalBody.innerHTML =
+      '<div class="empty">' +
+      'Trip Update를 불러오는 중입니다...' +
+      '</div>';
+
+    try {
+      await loadNotifications();
+    } catch (error) {
+      console.error(
+        'ROUTE Notification 조회 실패:',
+        error
+      );
+
+      elements.routeModalBody.innerHTML =
+        '<div class="leg-update-empty">' +
+        'Trip Update 조회에 실패했습니다.<br>' +
+        escapeHtml(error.message || String(error)) +
+        '</div>';
+
+      return;
+    }
+  }
+
+  console.log(
+    'ROUTE popup notification count:',
+    state.notifications.length,
+    'trip:',
+    trip.tripNumber
+  );
+
   const legs =
     Array.isArray(trip.legs)
       ? trip.legs
       : [];
-
-  elements.routeModalTitle.textContent =
-    trip.tripNumber + ' ROUTE';
 
   if (!legs.length) {
     elements.routeModalBody.innerHTML =
       '<div class="empty">' +
       'Route 정보가 없습니다.' +
       '</div>';
-
-    elements.routeModal.classList.add(
-      'open'
-    );
 
     return;
   }
