@@ -808,7 +808,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbxumsz_OPagctIBspmU-j08nY3m51GzVbRDtP4DBYgvOW0qrpNSxgnV0P3WdQ92i_Mn2Q/exec';
+      'https://script.google.com/macros/s/AKfycbztTCtjDN8LnUgmZtNEEndnJgO46zUCyfuqgia1gPlEHKTjSdSNcVUFg6DEzcg2ASd-ow/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -1007,9 +1007,16 @@
       return result;
     }
 
- async function loadNotifications() {
+async function loadNotifications(
+  forceRefresh
+) {
   const result =
-    await callBackend('notifications');
+    await callBackend(
+      'notifications',
+      forceRefresh
+        ? { refresh: 1 }
+        : {}
+    );
 
   state.notifications =
     Array.isArray(result.notifications)
@@ -1017,13 +1024,10 @@
       : [];
 
   console.log(
-    'Notification API result:',
-    result
-  );
-
-  console.log(
     'Notification loaded:',
-    state.notifications.length
+    state.notifications.length,
+    'cached:',
+    result.cached === true
   );
 
   return result;
@@ -1037,13 +1041,12 @@
 
       try {
         writeLog('현황 조회 시작', {
-          actions: ['trips', 'list', 'notifications']
+          actions: ['trips', 'list']
         });
 
         const results = await Promise.all([
           loadTrips(),
-          loadFiles(),
-          loadNotifications()
+          loadFiles()
         ]);
 
         writeLog('현황 조회 완료', results);
@@ -1098,7 +1101,7 @@
         await Promise.all([
           loadTrips(),
           loadFiles(),
-          loadNotifications()
+          loadNotifications(true)
         ]);
 
       } catch (error) {
@@ -1576,7 +1579,13 @@ function getLegUpdates(trip, leg) {
         notification.originalTitle ||
         notification.title
       );
-
+if (
+  /^New service\s+.+\s+added$/i.test(
+    parsed.displayTitle
+  )
+) {
+  return;
+}
     if (!parsed.airportIcao) {
       return;
     }
@@ -1804,7 +1813,7 @@ async function openRouteModal(tripIndex) {
       '</div>';
 
     try {
-      await loadNotifications();
+      await loadNotifications(false);
     } catch (error) {
       console.error(
         'ROUTE Notification 조회 실패:',
