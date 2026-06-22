@@ -808,7 +808,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbztTCtjDN8LnUgmZtNEEndnJgO46zUCyfuqgia1gPlEHKTjSdSNcVUFg6DEzcg2ASd-ow/exec';
+      'https://script.google.com/macros/s/AKfycbwGJ55bMR4hgrTb8qoMioDzp7mTk77Z_IaCUwrPpFNPh8hzV49HuxiS3H3ziKAY0yDQoQ/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -816,7 +816,8 @@
     busy: false,
     activeTrips: [],
     files: [],
-    notifications: []
+    notifications: [],
+    notificationPromise: null
   };
 
   const elements = {
@@ -1010,27 +1011,58 @@
 async function loadNotifications(
   forceRefresh
 ) {
-  const result =
-    await callBackend(
-      'notifications',
-      forceRefresh
-        ? { refresh: 1 }
-        : {}
-    );
+  if (
+    forceRefresh !== true &&
+    Array.isArray(state.notifications) &&
+    state.notifications.length > 0
+  ) {
+    return {
+      success: true,
+      notifications: state.notifications,
+      fromMemory: true,
+      cached: true
+    };
+  }
 
-  state.notifications =
-    Array.isArray(result.notifications)
-      ? result.notifications
-      : [];
+  if (
+    forceRefresh !== true &&
+    state.notificationPromise
+  ) {
+    return await state.notificationPromise;
+  }
 
-  console.log(
-    'Notification loaded:',
-    state.notifications.length,
-    'cached:',
-    result.cached === true
-  );
+  state.notificationPromise =
+    (async function () {
+      const result =
+        await callBackend(
+          'notifications',
+          forceRefresh
+            ? { refresh: 1 }
+            : {}
+        );
 
-  return result;
+      state.notifications =
+        Array.isArray(result.notifications)
+          ? result.notifications
+          : [];
+
+      console.log(
+        'Notification loaded:',
+        state.notifications.length,
+        'cached:',
+        result.cached === true,
+        'forceRefresh:',
+        forceRefresh === true
+      );
+
+      return result;
+    })();
+
+  try {
+    return await state.notificationPromise;
+  } finally {
+    state.notificationPromise = null;
+  }
 }
     async function refreshDashboard() {
       if (state.busy) {
@@ -1050,6 +1082,20 @@ async function loadNotifications(
         ]);
 
         writeLog('현황 조회 완료', results);
+
+        /*
+         * 화면은 먼저 빠르게 띄우고,
+         * Notification은 백그라운드에서 미리 불러와
+         * 첫 ROUTE 클릭 대기시간을 줄입니다.
+         */
+        window.setTimeout(function () {
+          loadNotifications(false).catch(function (error) {
+            console.error(
+              'Background notification preload failed:',
+              error
+            );
+          });
+        }, 0);
 
       } catch (error) {
         writeLog('현황 조회 실패', {
@@ -1582,6 +1628,9 @@ function getLegUpdates(trip, leg) {
 if (
   /^New service\s+.+\s+added$/i.test(
     parsed.displayTitle
+  ) ||
+  /\bremoved$/i.test(
+    parsed.displayTitle
   )
 ) {
   return;
@@ -1598,20 +1647,30 @@ if (
       return;
     }
 
-    if (
-      parsed.airportIcao !== departure &&
-      parsed.airportIcao !== arrival
-    ) {
-      return;
-    }
-
     const flightPlan =
       isFlightPlanUpdate(parsed);
+
+    /*
+     * Flight Plan 계열:
+     * 알림의 공항을 출발공항으로 보고 해당 LEG에 연결
+     *
+     * 일반 서비스:
+     * 도착공항 기준으로만 해당 LEG에 연결
+     */
+    if (flightPlan) {
+      if (parsed.airportIcao !== departure) {
+        return;
+      }
+    } else {
+      if (parsed.airportIcao !== arrival) {
+        return;
+      }
+    }
 
     const locationLabel =
       flightPlan
         ? departure + ' - ' + arrival
-        : parsed.airportIcao;
+        : arrival;
 
     const key =
       flightPlan
@@ -1693,15 +1752,6 @@ function renderLegUpdates(updates) {
     return (
       '<div class="leg-update-empty">' +
         '해당 LEG의 Trip Update가 없습니다.' +
-        (
-          Array.isArray(state.notifications)
-            ? '<br><small>Loaded notifications: ' +
-                escapeHtml(
-                  String(state.notifications.length)
-                ) +
-              '</small>'
-            : ''
-        ) +
       '</div>'
     );
   }
