@@ -539,6 +539,39 @@
   color: #c2410c;
 }
 
+.leg-update-group {
+  padding: 12px 14px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.leg-update-group + .leg-update-group {
+  margin-top: 8px;
+}
+
+.leg-update-group-head {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.leg-update-group-head.confirmed {
+  color: #15803d;
+}
+
+.leg-update-group-head.in-progress {
+  color: #c2410c;
+}
+
+.leg-update-group-services {
+  margin-top: 5px;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
 .aircraft-registration {
   white-space: nowrap;
   font-weight: 800;
@@ -1787,6 +1820,121 @@ function getNotificationTitleClass(
 }
 
 
+function normalizeUpdateStatus(value) {
+  const text =
+    String(value || '').trim();
+
+  if (/^In Progress$/i.test(text)) {
+    return 'In Progress';
+  }
+
+  if (/^Confirmed$/i.test(text)) {
+    return 'Confirmed';
+  }
+
+  return text || 'Other';
+}
+
+
+function getGroupedUpdateStatusOrder(status) {
+  if (status === 'In Progress') {
+    return 0;
+  }
+
+  if (status === 'Confirmed') {
+    return 1;
+  }
+
+  return 2;
+}
+
+
+function getGroupedUpdateStatusClass(status) {
+  if (status === 'In Progress') {
+    return ' in-progress';
+  }
+
+  if (status === 'Confirmed') {
+    return ' confirmed';
+  }
+
+  return '';
+}
+
+
+function groupLegUpdates(updates) {
+  const grouped = {};
+
+  updates.forEach(function (update) {
+    const location =
+      String(
+        update.locationLabel || ''
+      ).trim();
+
+    const status =
+      normalizeUpdateStatus(
+        update.status
+      );
+
+    const serviceName =
+      String(
+        update.serviceName ||
+        update.title ||
+        ''
+      )
+        .replace(
+          /\s+(In Progress|Confirmed|Cancelled|Canceled|Completed|Pending|Rejected|Failed)$/i,
+          ''
+        )
+        .trim();
+
+    const key =
+      location + '|' + status;
+
+    if (!grouped[key]) {
+      grouped[key] = {
+        location: location,
+        status: status,
+        services: []
+      };
+    }
+
+    if (
+      serviceName &&
+      grouped[key].services.indexOf(
+        serviceName
+      ) === -1
+    ) {
+      grouped[key].services.push(
+        serviceName
+      );
+    }
+  });
+
+  return Object.keys(grouped)
+    .map(function (key) {
+      return grouped[key];
+    })
+    .sort(function (a, b) {
+      const statusOrder =
+        getGroupedUpdateStatusOrder(
+          a.status
+        ) -
+        getGroupedUpdateStatusOrder(
+          b.status
+        );
+
+      if (statusOrder !== 0) {
+        return statusOrder;
+      }
+
+      return a.location.localeCompare(
+        b.location
+      );
+    });
+}
+
+
 function renderLegUpdates(updates) {
   if (!updates.length) {
     return (
@@ -1796,37 +1944,35 @@ function renderLegUpdates(updates) {
     );
   }
 
+  const groups =
+    groupLegUpdates(updates);
+
   return (
     '<div class="leg-update-list">' +
-      updates.map(function (update) {
+      groups.map(function (group) {
         return (
-          '<div class="leg-update-card">' +
+          '<div class="leg-update-group">' +
 
-            '<div class="leg-update-location">' +
-              escapeHtml(
-                update.locationLabel || ''
-              ) +
-            '</div>' +
-
-            '<div class="leg-update-title' +
-              getNotificationTitleClass(
-                update.title
+            '<div class="leg-update-group-head' +
+              getGroupedUpdateStatusClass(
+                group.status
               ) +
             '">' +
               escapeHtml(
-                update.title || ''
+                group.location || ''
               ) +
+              ' (' +
+              escapeHtml(
+                group.status || ''
+              ) +
+              ')' +
             '</div>' +
 
-            (
-              update.createdAtUtc
-                ? '<div class="leg-update-time">' +
-                    escapeHtml(
-                      update.createdAtUtc
-                    ) +
-                  '</div>'
-                : ''
-            ) +
+            '<div class="leg-update-group-services">' +
+              escapeHtml(
+                group.services.join(' / ')
+              ) +
+            '</div>' +
 
           '</div>'
         );
