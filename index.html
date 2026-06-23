@@ -855,16 +855,24 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbyQ2GUOz9vlgJiVtZstIfzEAJjGSPodXeHsd8SCiSDRKwTjuatl9JHmMnikMpL_vvAMvw/exec';
+      'https://script.google.com/macros/s/AKfycbwa2O2fKnXvDtVVwHb7hU8EGoVsDa0Nr-zwjuh3dfgLD2xw9rPw6r-daqBzCZeeeqpdgw/exec';
 
   let GTMX_APP_STARTED = false;
+
+  const BRIEF_LOCAL_CACHE_KEY =
+    'GTMX_FLIGHT_BRIEF_CACHE_V2';
+
+  const BRIEF_LOCAL_CACHE_MAX_AGE_MS =
+    45 * 60 * 1000;
 
   const state = {
     busy: false,
     activeTrips: [],
     files: [],
     briefServices: [],
-    briefServicesPromise: null
+    briefServicesByTripLeg: Object.create(null),
+    briefServicesPromise: null,
+    briefCacheGeneratedAt: ''
   };
 
   const elements = {
@@ -1055,6 +1063,137 @@
       return result;
     }
 
+function buildBriefServiceIndex(records) {
+  const index = Object.create(null);
+
+  (Array.isArray(records) ? records : [])
+    .forEach(function (record) {
+      const tripNumber = String(
+        record && record.tripNumber
+          ? record.tripNumber
+          : ''
+      ).trim().toUpperCase();
+
+      const legSequence = Number(
+        record && record.targetLegSequence
+          ? record.targetLegSequence
+          : 0
+      );
+
+      if (!tripNumber || !legSequence) {
+        return;
+      }
+
+      const key =
+        tripNumber + '|' + legSequence;
+
+      if (!index[key]) {
+        index[key] = [];
+      }
+
+      index[key].push(record);
+    });
+
+  return index;
+}
+
+function saveBriefServicesToLocalCache(
+  records,
+  generatedAt
+) {
+  try {
+    window.localStorage.setItem(
+      BRIEF_LOCAL_CACHE_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        generatedAt: generatedAt || '',
+        records: Array.isArray(records)
+          ? records
+          : []
+      })
+    );
+  } catch (error) {
+    console.warn(
+      'Flight Brief local cache save failed:',
+      error
+    );
+  }
+}
+
+function restoreBriefServicesFromLocalCache() {
+  if (
+    Array.isArray(state.briefServices) &&
+    state.briefServices.length > 0
+  ) {
+    return false;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(
+      BRIEF_LOCAL_CACHE_KEY
+    );
+
+    if (!raw) {
+      return false;
+    }
+
+    const cached = JSON.parse(raw);
+    const savedAt = Number(cached.savedAt || 0);
+    const age = Date.now() - savedAt;
+
+    if (
+      !savedAt ||
+      age < 0 ||
+      age > BRIEF_LOCAL_CACHE_MAX_AGE_MS ||
+      !Array.isArray(cached.records)
+    ) {
+      window.localStorage.removeItem(
+        BRIEF_LOCAL_CACHE_KEY
+      );
+      return false;
+    }
+
+    state.briefServices = cached.records;
+    state.briefServicesByTripLeg =
+      buildBriefServiceIndex(cached.records);
+    state.briefCacheGeneratedAt =
+      cached.generatedAt || '';
+
+    console.log(
+      'Flight Brief restored from local cache:',
+      cached.records.length
+    );
+
+    return true;
+  } catch (error) {
+    console.warn(
+      'Flight Brief local cache restore failed:',
+      error
+    );
+    return false;
+  }
+}
+
+function applyBriefServicesResult(result) {
+  const records =
+    result && Array.isArray(result.records)
+      ? result.records
+      : [];
+
+  state.briefServices = records;
+  state.briefServicesByTripLeg =
+    buildBriefServiceIndex(records);
+  state.briefCacheGeneratedAt =
+    result && result.generatedAt
+      ? result.generatedAt
+      : '';
+
+  saveBriefServicesToLocalCache(
+    records,
+    state.briefCacheGeneratedAt
+  );
+}
+
 async function loadBriefServices(
   forceRefresh
 ) {
@@ -1067,7 +1206,8 @@ async function loadBriefServices(
       success: true,
       records: state.briefServices,
       fromMemory: true,
-      cached: true
+      cached: true,
+      generatedAt: state.briefCacheGeneratedAt
     };
   }
 
@@ -1088,10 +1228,7 @@ async function loadBriefServices(
             : {}
         );
 
-      state.briefServices =
-        Array.isArray(result.records)
-          ? result.records
-          : [];
+      applyBriefServicesResult(result);
 
       console.log(
         'Flight Brief services loaded:',
@@ -1116,33 +1253,44 @@ async function loadBriefServices(
         return;
       }
 
+      restoreBriefServicesFromLocalCache();
       setBusy(true);
 
       try {
         writeLog('현황 조회 시작', {
-          actions: ['trips', 'list']
+          actions: ['trips', 'list', 'briefs']
         });
+
+        /*
+         * 세 요청을 동시에 시작합니다.
+         * Flight Brief 실패는 Trip/PDF 목록 표시를 막지 않습니다.
+         */
+        const briefPromise =
+          loadBriefServices(false)
+            .catch(function (error) {
+              console.error(
+                'Flight Brief preload failed:',
+                error
+              );
+
+              writeLog(
+                'Flight Brief 사전 조회 실패',
+                { error: error.message }
+              );
+
+              return {
+                success: false,
+                error: error.message
+              };
+            });
 
         const results = await Promise.all([
           loadTrips(),
-          loadFiles()
+          loadFiles(),
+          briefPromise
         ]);
 
         writeLog('현황 조회 완료', results);
-
-        /*
-         * 화면은 먼저 빠르게 띄우고,
-         * Flight Brief 서비스 상태는 백그라운드에서 미리 불러와
-         * 첫 ROUTE 클릭 대기시간을 줄입니다.
-         */
-        window.setTimeout(function () {
-          loadBriefServices(false).catch(function (error) {
-            console.error(
-              'Background Flight Brief preload failed:',
-              error
-            );
-          });
-        }, 0);
 
       } catch (error) {
         writeLog('현황 조회 실패', {
@@ -1474,21 +1622,21 @@ function getLegUpdates(trip, leg) {
    * Trip + Station + Service별 최종 상태를 확정합니다.
    * 프런트에서는 제목 파싱이나 상태 재판단을 하지 않습니다.
    */
-  return state.briefServices
-    .filter(function (record) {
-      return (
-        String(record.tripNumber || '')
-          .trim()
-          .toUpperCase() === tripNumber &&
-        Number(record.targetLegSequence || 0) === legSequence
-      );
-    })
+  const indexedRecords =
+    state.briefServicesByTripLeg[
+      tripNumber + '|' + legSequence
+    ] || [];
+
+  return indexedRecords
     .map(function (record) {
       return {
         id: [
           record.tripNumber || '',
+          record.targetLegSequence || '',
           record.stationSequence || '',
-          record.serviceKey || ''
+          record.serviceKey || '',
+          record.clearanceDirection || '',
+          record.sourceOrder || ''
         ].join('|'),
         locationLabel:
           record.locationLabel ||
@@ -1505,7 +1653,14 @@ function getLegUpdates(trip, leg) {
         legSequence: record.targetLegSequence || null,
         isFlightPlan: record.isFlightPlan === true,
         sourceOrder: record.sourceOrder || 0,
-        confidence: record.confidence || ''
+        confidence: record.confidence || '',
+        clearanceDirection:
+          record.clearanceDirection || '',
+        rawServiceName:
+          record.rawServiceName ||
+          record.rawClearanceService ||
+          '',
+        sourceType: record.sourceType || ''
       };
     })
     .sort(function (a, b) {
