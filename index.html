@@ -855,7 +855,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbxywBO4ANCQyJsxFlpCu9yyX7n_Rwn9hYD9fZFuuSL4NxcktZBjTL-FeCvp5iCEAaig0Q/exec';
+      'https://script.google.com/macros/s/AKfycbzLBO5aJ7myQ30M3qR1luexUI6gICgPvbSt2eAPHKx7t80YreacWUCXdYNsFr1NSDvB9Q/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -1698,6 +1698,75 @@ function getLegUpdates(trip, leg) {
       .trim()
       .toUpperCase();
 
+  const legSequence =
+    Number(
+      leg && leg.sequence
+        ? leg.sequence
+        : 0
+    );
+
+  /*
+   * Trip LEG 데이터에서 전체 ROUTE Station 생성
+   *
+   * 예:
+   * LEG 1 RKSS-PANC
+   * LEG 2 PANC-KTEB
+   * LEG 3 KTEB-KSJC
+   *
+   * 결과:
+   * 1 RKSS
+   * 2 PANC
+   * 3 KTEB
+   * 4 KSJC
+   */
+  const routeStations = [];
+
+  const sortedLegs =
+    Array.isArray(trip && trip.legs)
+      ? trip.legs
+          .slice()
+          .sort(function (a, b) {
+            return (
+              Number(a.sequence || 0) -
+              Number(b.sequence || 0)
+            );
+          })
+      : [];
+
+  sortedLegs.forEach(function (
+    routeLeg,
+    index
+  ) {
+    const departure =
+      String(
+        routeLeg.departureIcao || ''
+      )
+        .trim()
+        .toUpperCase();
+
+    const arrival =
+      String(
+        routeLeg.arrivalIcao || ''
+      )
+        .trim()
+        .toUpperCase();
+
+    if (
+      index === 0 &&
+      departure
+    ) {
+      routeStations.push(
+        departure
+      );
+    }
+
+    if (arrival) {
+      routeStations.push(
+        arrival
+      );
+    }
+  });
+
   const departure =
     String(
       leg && leg.departureIcao
@@ -1715,32 +1784,6 @@ function getLegUpdates(trip, leg) {
     )
       .trim()
       .toUpperCase();
-
-  const legSequence =
-    Number(
-      leg && leg.sequence
-        ? leg.sequence
-        : 0
-    );
-
-  const routeStations =
-    buildRouteStations(trip);
-
-  /*
-   * 화면의 각 LEG에는 도착 Station을 연결합니다.
-   *
-   * LEG 1 RKSS-PANC  -> Station 2 PANC
-   * LEG 2 PANC-KTEB  -> Station 3 KTEB
-   * LEG 3 KTEB-KSJC  -> Station 4 KSJC
-   *
-   * 따라서:
-   * PPR 3-KSJC/SJC      -> Station 3 KTEB
-   * Handling 4-KSJC/SJC -> Station 4 KSJC
-   */
-  const arrivalStationSequence =
-    legSequence > 0
-      ? legSequence + 1
-      : 0;
 
   const latestMap = {};
 
@@ -1784,99 +1827,102 @@ function getLegUpdates(trip, leg) {
     const flightPlan =
       isFlightPlanUpdate(parsed);
 
-    let locationLabel = '';
-    let actualAirportIcao = '';
-    let key = '';
-
-    if (flightPlan) {
-      /*
-       * Flight Plan 계열 숫자는 기존과 같이 LEG 번호로 처리합니다.
-       * 제목 공항은 해당 LEG 출발공항과 일치해야 합니다.
-       */
+    /*
+     * 숫자가 있는 Notification:
+     *
+     * 숫자 = ROUTE Station 순번
+     * 숫자 = 표시할 LEG 번호
+     *
+     * 예:
+     * 3 → LEG 3 / Station 3 KTEB
+     * 4 → LEG 4 / Station 4 KSJC
+     */
+    if (parsed.sequenceHint) {
       if (
-        parsed.sequenceHint &&
-        legSequence &&
-        parsed.sequenceHint !== legSequence
-      ) {
-        return;
-      }
-
-      if (
-        parsed.airportIcao &&
-        parsed.airportIcao !== departure
-      ) {
-        return;
-      }
-
-      actualAirportIcao = departure;
-      locationLabel =
-        departure + ' - ' + arrival;
-
-      key = [
-        'FLIGHT',
-        legSequence,
-        parsed.serviceKey
-      ].join('|');
-
-    } else if (parsed.sequenceHint) {
-      /*
-       * 일반 서비스의 숫자는 전체 ROUTE의 Station 순번입니다.
-       * 제목 뒤 공항코드는 서비스 위치 판정에 사용하지 않습니다.
-       *
-       * 예:
-       * 3-KSJC/SJC -> Station 3 = KTEB
-       * 4-KSJC/SJC -> Station 4 = KSJC
-       */
-      if (
-        !arrivalStationSequence ||
+        !legSequence ||
         parsed.sequenceHint !==
-          arrivalStationSequence
+          legSequence
       ) {
         return;
       }
-
-      actualAirportIcao =
-        getStationForSequence(
-          routeStations,
-          parsed.sequenceHint
-        );
-
-      if (!actualAirportIcao) {
-        return;
-      }
-
-      locationLabel =
-        actualAirportIcao;
-
-      key = [
-        'STATION',
-        parsed.sequenceHint,
-        actualAirportIcao,
-        parsed.serviceKey
-      ].join('|');
-
     } else {
       /*
-       * 숫자가 없는 예전 알림은 기존 방식대로
-       * 제목의 공항코드와 도착공항을 비교합니다.
+       * 숫자가 없는 옛 Notification fallback
+       *
+       * Flight Plan은 출발공항,
+       * 일반 서비스는 출발·도착공항 중 하나가
+       * 일치할 때만 표시합니다.
        */
-      if (
-        !parsed.airportIcao ||
-        parsed.airportIcao !== arrival
-      ) {
-        return;
+      if (flightPlan) {
+        if (
+          !parsed.airportIcao ||
+          parsed.airportIcao !== departure
+        ) {
+          return;
+        }
+      } else {
+        if (
+          !parsed.airportIcao ||
+          (
+            parsed.airportIcao !== departure &&
+            parsed.airportIcao !== arrival
+          )
+        ) {
+          return;
+        }
       }
-
-      actualAirportIcao = arrival;
-      locationLabel = arrival;
-
-      key = [
-        'GROUND-FALLBACK',
-        arrivalStationSequence,
-        actualAirportIcao,
-        parsed.serviceKey
-      ].join('|');
     }
+
+    /*
+     * 실제 표시 위치는 제목 뒤 공항이 아니라
+     * ROUTE Station 숫자로 결정합니다.
+     */
+    const stationAirport =
+      parsed.sequenceHint
+        ? (
+            routeStations[
+              parsed.sequenceHint - 1
+            ] || ''
+          )
+        : (
+            flightPlan
+              ? departure
+              : (
+                  parsed.airportIcao ||
+                  departure ||
+                  arrival
+                )
+          );
+
+    if (!stationAirport) {
+      return;
+    }
+
+    const locationLabel =
+      flightPlan
+        ? departure + ' - ' + arrival
+        : stationAirport;
+
+    /*
+     * 같은 Trip + 같은 Station + 같은 서비스는
+     * 최신 Notification 한 건만 남깁니다.
+     *
+     * In Progress 이후 Confirmed가 오면
+     * Confirmed만 남습니다.
+     */
+    const key = [
+      flightPlan
+        ? 'FLIGHT'
+        : 'SERVICE',
+
+      parsed.sequenceHint ||
+        legSequence ||
+        0,
+
+      stationAirport,
+
+      parsed.serviceKey
+    ].join('|');
 
     const normalized = {
       id:
@@ -1905,23 +1951,18 @@ function getLegUpdates(trip, leg) {
           notification
         ),
 
+      /*
+       * 제목 끝 공항 코드가 아니라
+       * 실제 Route Station 공항을 저장합니다.
+       */
       airportIcao:
-        actualAirportIcao,
+        stationAirport,
 
-      notificationAirportIcao:
-        parsed.airportIcao,
+      sourceAirportIcao:
+        parsed.airportIcao || '',
 
-      stationSequence:
-        flightPlan
-          ? null
-          : (
-              parsed.sequenceHint ||
-              arrivalStationSequence ||
-              null
-            ),
-
-      legSequence:
-        legSequence || null,
+      sequenceHint:
+        parsed.sequenceHint || 0,
 
       isFlightPlan:
         flightPlan
@@ -1939,7 +1980,8 @@ function getLegUpdates(trip, leg) {
         current
       )
     ) {
-      latestMap[key] = normalized;
+      latestMap[key] =
+        normalized;
     }
   });
 
