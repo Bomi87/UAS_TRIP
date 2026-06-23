@@ -709,7 +709,7 @@
   <div>
     <h1>GTMx Trip Document Manager</h1>
     <p>
-      '새로고침' 버튼을 누르면 Active Trip의 Document를 즉시 갱신합니다.
+      '새로고침' 버튼을 누르면 Active Trip PDF와 Flight Brief 서비스 상태를 즉시 갱신합니다.
     </p>
   </div>
 
@@ -855,7 +855,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbwcaa33ZqZ_ufMpPlsoQJVIM-huEnWvv315hI4HCksKdk3NhSCKSiBXj0z6Hlka3oqEEA/exec';
+      'https://script.google.com/macros/s/AKfycby-kXa9YyB7gq21LwWHLVfxeqaTXBvHfNYWSBVZSEjYgtx8phQ0dN8KoxPH62c14ObBhg/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -863,8 +863,8 @@
     busy: false,
     activeTrips: [],
     files: [],
-    notifications: [],
-    notificationPromise: null
+    briefServices: [],
+    briefServicesPromise: null
   };
 
   const elements = {
@@ -1055,17 +1055,17 @@
       return result;
     }
 
-async function loadNotifications(
+async function loadBriefServices(
   forceRefresh
 ) {
   if (
     forceRefresh !== true &&
-    Array.isArray(state.notifications) &&
-    state.notifications.length > 0
+    Array.isArray(state.briefServices) &&
+    state.briefServices.length > 0
   ) {
     return {
       success: true,
-      notifications: state.notifications,
+      records: state.briefServices,
       fromMemory: true,
       cached: true
     };
@@ -1073,29 +1073,29 @@ async function loadNotifications(
 
   if (
     forceRefresh !== true &&
-    state.notificationPromise
+    state.briefServicesPromise
   ) {
-    return await state.notificationPromise;
+    return await state.briefServicesPromise;
   }
 
-  state.notificationPromise =
+  state.briefServicesPromise =
     (async function () {
       const result =
         await callBackend(
-          'notifications',
+          'briefs',
           forceRefresh
             ? { refresh: 1 }
             : {}
         );
 
-      state.notifications =
-        Array.isArray(result.notifications)
-          ? result.notifications
+      state.briefServices =
+        Array.isArray(result.records)
+          ? result.records
           : [];
 
       console.log(
-        'Notification loaded:',
-        state.notifications.length,
+        'Flight Brief services loaded:',
+        state.briefServices.length,
         'cached:',
         result.cached === true,
         'forceRefresh:',
@@ -1106,9 +1106,9 @@ async function loadNotifications(
     })();
 
   try {
-    return await state.notificationPromise;
+    return await state.briefServicesPromise;
   } finally {
-    state.notificationPromise = null;
+    state.briefServicesPromise = null;
   }
 }
     async function refreshDashboard() {
@@ -1132,13 +1132,13 @@ async function loadNotifications(
 
         /*
          * 화면은 먼저 빠르게 띄우고,
-         * Notification은 백그라운드에서 미리 불러와
+         * Flight Brief 서비스 상태는 백그라운드에서 미리 불러와
          * 첫 ROUTE 클릭 대기시간을 줄입니다.
          */
         window.setTimeout(function () {
-          loadNotifications(false).catch(function (error) {
+          loadBriefServices(false).catch(function (error) {
             console.error(
-              'Background notification preload failed:',
+              'Background Flight Brief preload failed:',
               error
             );
           });
@@ -1194,7 +1194,7 @@ async function loadNotifications(
         await Promise.all([
           loadTrips(),
           loadFiles(),
-          loadNotifications(true)
+          loadBriefServices(true)
         ]);
 
       } catch (error) {
@@ -1447,341 +1447,77 @@ const localToDateTime =
 
 
   
-    function cleanNotificationTitle(value) {
-  return String(value || '')
-    .replace(
-      /\s*-\s*undefined\/undefined\s*$/i,
-      ''
-    )
-    .replace(
-      /\s*-\s*(?:\d+\s*-\s*)?[A-Z0-9]{3,4}\/[A-Z0-9]{3,4}\s*$/i,
-      ''
-    )
-    .trim();
-}
-
-
-function parseNotificationTitle(value) {
-  const original =
-    String(value || '').trim();
-
-  const cleanedUndefined =
-    original.replace(
-      /\s*-\s*undefined\/undefined\s*$/i,
-      ''
-    );
-
-  const stationMatch =
-    cleanedUndefined.match(
-      /\s*-\s*(?:(\d+)\s*-\s*)?([A-Z0-9]{3,4})\/([A-Z0-9]{3,4})\s*$/i
-    );
-
-  const sequenceHint =
-    stationMatch && stationMatch[1]
-      ? Number(stationMatch[1])
-      : null;
-
-  const airportIcao =
-    stationMatch && stationMatch[2]
-      ? stationMatch[2].toUpperCase()
-      : '';
-
-  const withoutStation =
-    stationMatch
-      ? cleanedUndefined.slice(
-          0,
-          stationMatch.index
-        ).trim()
-      : cleanedUndefined.trim();
-
-  const statusMatch =
-    withoutStation.match(
-      /\s+(In Progress|Confirmed|Approved|Cancelled|Canceled|Completed|Pending|Rejected|Failed)$/i
-    );
-
-  const status =
-    statusMatch
-      ? statusMatch[1]
-      : '';
-
-  const serviceName =
-    statusMatch
-      ? withoutStation.slice(
-          0,
-          statusMatch.index
-        ).trim()
-      : withoutStation;
-
-  return {
-    original: original,
-    displayTitle: withoutStation,
-    serviceName: serviceName,
-    serviceKey:
-      serviceName
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toUpperCase(),
-    status: status,
-    airportIcao: airportIcao,
-    sequenceHint: sequenceHint
-  };
-}
-
-
-function isFlightPlanUpdate(parsed) {
-  const service =
-    String(
-      parsed && parsed.serviceName
-        ? parsed.serviceName
-        : ''
-    ).toUpperCase();
-
-  return (
-    service.includes(
-      'OPERATIONAL FLIGHT PACKAGE'
-    ) ||
-    service.includes(
-      'TEST FLIGHT PLAN'
-    ) ||
-    service === 'FLIGHT PLAN'
+function getBriefRecordSortValue(item) {
+  return Number(
+    item && item.sourceOrder != null
+      ? item.sourceOrder
+      : 0
   );
-}
-
-
-function getNotificationTimeValue(item) {
-  const value =
-    new Date(
-      item && item.createdAt
-        ? item.createdAt
-        : 0
-    ).getTime();
-
-  return Number.isFinite(value)
-    ? value
-    : 0;
-}
-
-
-function formatNotificationUtcForDisplay(item) {
-  const supplied =
-    String(
-      item && item.createdAtUtc
-        ? item.createdAtUtc
-        : ''
-    ).trim();
-
-  if (supplied) {
-    return supplied + 'Z';
-  }
-
-  const date =
-    new Date(
-      item && item.createdAt
-        ? item.createdAt
-        : ''
-    );
-
-  if (isNaN(date.getTime())) {
-    return '';
-  }
-
-  const year =
-    date.getUTCFullYear();
-
-  const month =
-    String(
-      date.getUTCMonth() + 1
-    ).padStart(2, '0');
-
-  const day =
-    String(
-      date.getUTCDate()
-    ).padStart(2, '0');
-
-  const hour =
-    String(
-      date.getUTCHours()
-    ).padStart(2, '0');
-
-  const minute =
-    String(
-      date.getUTCMinutes()
-    ).padStart(2, '0');
-
-  return (
-    year + '-' +
-    month + '-' +
-    day + ' ' +
-    hour + ':' +
-    minute + 'Z'
-  );
-}
-
-
-function buildRouteStations(trip) {
-  const legs =
-    Array.isArray(trip && trip.legs)
-      ? trip.legs.slice()
-      : [];
-
-  legs.sort(function (a, b) {
-    return (
-      Number(a && a.sequence ? a.sequence : 0) -
-      Number(b && b.sequence ? b.sequence : 0)
-    );
-  });
-
-  const stations = [];
-
-  legs.forEach(function (routeLeg, index) {
-    const departure =
-      String(
-        routeLeg && routeLeg.departureIcao
-          ? routeLeg.departureIcao
-          : ''
-      )
-        .trim()
-        .toUpperCase();
-
-    const arrival =
-      String(
-        routeLeg && routeLeg.arrivalIcao
-          ? routeLeg.arrivalIcao
-          : ''
-      )
-        .trim()
-        .toUpperCase();
-
-    if (index === 0 && departure) {
-      stations.push(departure);
-    }
-
-    if (arrival) {
-      stations.push(arrival);
-    }
-  });
-
-  return stations;
-}
-
-
-function getStationForSequence(
-  routeStations,
-  sequence
-) {
-  const stationSequence =
-    Number(sequence || 0);
-
-  if (
-    !stationSequence ||
-    stationSequence < 1 ||
-    stationSequence > routeStations.length
-  ) {
-    return '';
-  }
-
-  return String(
-    routeStations[stationSequence - 1] || ''
-  )
-    .trim()
-    .toUpperCase();
-}
-
-
-function normalizeNotificationServiceKey(value) {
-  const text =
-    String(value || '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toUpperCase();
-
-  if (text === 'HANDLING' || text === 'GROUND HANDLING') {
-    return 'GROUND HANDLING';
-  }
-
-  if (text === 'FUEL' || text === 'REFUEL' || text === 'REFUELING') {
-    return 'REFUELING';
-  }
-
-  return text;
-}
-
-
-function getNotificationServiceDisplayName(value) {
-  const key = normalizeNotificationServiceKey(value);
-
-  if (key === 'GROUND HANDLING') {
-    return 'Ground Handling';
-  }
-
-  if (key === 'REFUELING') {
-    return 'Refueling';
-  }
-
-  return String(value || '')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 
 function getLegUpdates(trip, leg) {
   const tripNumber = String(
-    trip && trip.tripNumber ? trip.tripNumber : ''
+    trip && trip.tripNumber
+      ? trip.tripNumber
+      : ''
   ).trim().toUpperCase();
 
   const legSequence = Number(
-    leg && leg.sequence ? leg.sequence : 0
+    leg && leg.sequence
+      ? leg.sequence
+      : 0
   );
 
   /*
-   * 백엔드가 이미 Trip + Station + Service 기준으로
-   * 최신 상태를 하나만 남겼으므로 프런트에서는
-   * 제목을 다시 파싱하지 않습니다.
+   * 백엔드가 Flight Brief PDF를 기준으로
+   * Trip + Station + Service별 최종 상태를 확정합니다.
+   * 프런트에서는 제목 파싱이나 상태 재판단을 하지 않습니다.
    */
-  return state.notifications
-    .filter(function (notification) {
+  return state.briefServices
+    .filter(function (record) {
       return (
-        String(notification.tripNumber || '').trim().toUpperCase() === tripNumber &&
-        Number(notification.targetLegSequence || 0) === legSequence
+        String(record.tripNumber || '')
+          .trim()
+          .toUpperCase() === tripNumber &&
+        Number(record.targetLegSequence || 0) === legSequence
       );
     })
-    .map(function (notification) {
+    .map(function (record) {
       return {
-        id: notification.id || '',
-        locationLabel: notification.locationLabel || notification.stationAirport || '',
-        title: notification.serviceName || '',
-        serviceName: notification.serviceName || '',
-        serviceKey: notification.serviceKey || '',
-        status: normalizeUpdateStatus(notification.status),
-        createdAt: notification.createdAt || '',
-        createdAtUtc: notification.createdAtUtc ? notification.createdAtUtc + 'Z' : '',
-        airportIcao: notification.stationAirport || '',
-        stationSequence: notification.stationSequence || null,
-        legSequence: notification.targetLegSequence || null,
-        isFlightPlan: notification.isFlightPlan === true
+        id: [
+          record.tripNumber || '',
+          record.stationSequence || '',
+          record.serviceKey || ''
+        ].join('|'),
+        locationLabel:
+          record.locationLabel ||
+          record.stationAirport ||
+          '',
+        title: record.serviceName || '',
+        serviceName: record.serviceName || '',
+        serviceKey: record.serviceKey || '',
+        status: normalizeUpdateStatus(record.status),
+        createdAt: '',
+        createdAtUtc: '',
+        airportIcao: record.stationAirport || '',
+        stationSequence: record.stationSequence || null,
+        legSequence: record.targetLegSequence || null,
+        isFlightPlan: record.isFlightPlan === true,
+        sourceOrder: record.sourceOrder || 0,
+        confidence: record.confidence || ''
       };
     })
     .sort(function (a, b) {
-      return getNotificationTimeValue(b) - getNotificationTimeValue(a);
+      if (a.isFlightPlan !== b.isFlightPlan) {
+        return a.isFlightPlan ? 1 : -1;
+      }
+
+      return (
+        getBriefRecordSortValue(a) -
+        getBriefRecordSortValue(b)
+      );
     });
-}
-
-
-function getNotificationTitleClass(
-  title
-) {
-  const text =
-    String(title || '').trim();
-
-  if (/\bConfirmed$/i.test(text)) {
-    return ' confirmed';
-  }
-
-  if (/\bIn Progress$/i.test(text)) {
-    return ' in-progress';
-  }
-
-  return '';
 }
 
 
@@ -2011,26 +1747,26 @@ async function openRouteModal(tripIndex) {
 
   /*
    * 초기 화면 조회가 끝나기 전에 ROUTE를 눌렀거나
-   * Notification 호출이 누락된 경우 여기서 다시 조회합니다.
+   * Flight Brief 호출이 누락된 경우 여기서 다시 조회합니다.
    */
-  if (!Array.isArray(state.notifications) ||
-      state.notifications.length === 0) {
+  if (!Array.isArray(state.briefServices) ||
+      state.briefServices.length === 0) {
     elements.routeModalBody.innerHTML =
       '<div class="empty">' +
-      'Trip Update를 불러오는 중입니다...' +
+      'Flight Brief 서비스 상태를 불러오는 중입니다...' +
       '</div>';
 
     try {
-      await loadNotifications(false);
+      await loadBriefServices(false);
     } catch (error) {
       console.error(
-        'ROUTE Notification 조회 실패:',
+        'ROUTE Flight Brief 조회 실패:',
         error
       );
 
       elements.routeModalBody.innerHTML =
         '<div class="leg-update-empty">' +
-        'Trip Update 조회에 실패했습니다.<br>' +
+        'Flight Brief 조회에 실패했습니다.<br>' +
         escapeHtml(error.message || String(error)) +
         '</div>';
 
@@ -2039,8 +1775,8 @@ async function openRouteModal(tripIndex) {
   }
 
   console.log(
-    'ROUTE popup notification count:',
-    state.notifications.length,
+    'ROUTE popup Flight Brief record count:',
+    state.briefServices.length,
     'trip:',
     trip.tripNumber
   );
