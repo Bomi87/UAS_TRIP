@@ -855,7 +855,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbxKj1RxBno_rlDpDItelNb9iiO-UdwssPckIV0pTwLU51M3-rK4XyLitKvdOMWAJkzy_Q/exec';
+      'https://script.google.com/macros/s/AKfycbwcaa33ZqZ_ufMpPlsoQJVIM-huEnWvv315hI4HCksKdk3NhSCKSiBXj0z6Hlka3oqEEA/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -1729,166 +1729,43 @@ function getLegUpdates(trip, leg) {
     trip && trip.tripNumber ? trip.tripNumber : ''
   ).trim().toUpperCase();
 
-  const departure = String(
-    leg && leg.departureIcao ? leg.departureIcao : ''
-  ).trim().toUpperCase();
-
-  const arrival = String(
-    leg && leg.arrivalIcao ? leg.arrivalIcao : ''
-  ).trim().toUpperCase();
-
   const legSequence = Number(
     leg && leg.sequence ? leg.sequence : 0
   );
 
-  const routeStations = buildRouteStations(trip);
-  const latestMap = {};
-
-  state.notifications.forEach(function (notification) {
-    const notificationTrip = String(
-      notification.tripNumber ||
-      notification.description ||
-      ''
-    )
-      .replace(/^Trip\s+/i, '')
-      .trim()
-      .toUpperCase();
-
-    if (!tripNumber || notificationTrip !== tripNumber) {
-      return;
-    }
-
-    const parsed = parseNotificationTitle(
-      notification.originalTitle || notification.title
-    );
-
-    if (
-      /^New service\s+.+\s+added$/i.test(parsed.displayTitle) ||
-      /\bremoved$/i.test(parsed.displayTitle)
-    ) {
-      return;
-    }
-
-    const flightPlan = isFlightPlanUpdate(parsed);
-    const stationSequence = Number(parsed.sequenceHint || 0);
-    const serviceKey = normalizeNotificationServiceKey(
-      parsed.serviceName
-    );
-
-    let actualAirportIcao = '';
-    let locationLabel = '';
-    let key = '';
-
-    if (flightPlan) {
-      /* Flight Plan 숫자는 LEG 번호 */
-      const targetLegSequence =
-        stationSequence || legSequence;
-
-      if (!legSequence || targetLegSequence !== legSequence) {
-        return;
-      }
-
-      actualAirportIcao = departure;
-      locationLabel = departure + ' - ' + arrival;
-
-      key = [
-        'FLIGHT',
-        legSequence,
-        serviceKey
-      ].join('|');
-
-    } else {
-      /*
-       * 모든 공항 서비스(PPR 포함)는 반드시 숫자가 있어야 합니다.
-       * 숫자 = 전체 ROUTE의 Station 순번입니다.
-       *
-       * Station N 서비스 -> LEG N-1의 도착공항 아래 표시
-       * 예:
-       * PPR 3 -> Station 3 KTEB -> LEG 2 PANC-KTEB
-       * Handling 4 -> Station 4 KSJC -> LEG 3 KTEB-KSJC
-       *
-       * 번호 없는 과거 알림은 반복 공항 및 PPR 위치를
-       * 정확히 판별할 수 없으므로 화면에서 제외합니다.
-       */
-      if (!stationSequence) {
-        return;
-      }
-
-      const targetLegSequence =
-        stationSequence === 1
-          ? 1
-          : stationSequence - 1;
-
-      if (!legSequence || targetLegSequence !== legSequence) {
-        return;
-      }
-
-      actualAirportIcao = getStationForSequence(
-        routeStations,
-        stationSequence
+  /*
+   * 백엔드가 이미 Trip + Station + Service 기준으로
+   * 최신 상태를 하나만 남겼으므로 프런트에서는
+   * 제목을 다시 파싱하지 않습니다.
+   */
+  return state.notifications
+    .filter(function (notification) {
+      return (
+        String(notification.tripNumber || '').trim().toUpperCase() === tripNumber &&
+        Number(notification.targetLegSequence || 0) === legSequence
       );
-
-      if (!actualAirportIcao) {
-        return;
-      }
-
-      locationLabel = actualAirportIcao;
-
-      /*
-       * Station + 실제 공항 + 정규화 서비스명을 하나의 키로 사용합니다.
-       * In Progress / Approved / Confirmed 제목 차이와
-       * 제목 뒤 공항 코드 차이는 키에 포함하지 않습니다.
-       */
-      key = [
-        'STATION',
-        stationSequence,
-        actualAirportIcao,
-        serviceKey
-      ].join('|');
-    }
-
-    const normalized = {
-      id: notification.id || '',
-      locationLabel: locationLabel,
-      title:
-        parsed.displayTitle ||
-        cleanNotificationTitle(notification.title),
-      serviceName:
-        getNotificationServiceDisplayName(parsed.serviceName),
-      status: normalizeUpdateStatus(parsed.status),
-      createdAt: notification.createdAt || '',
-      createdAtUtc:
-        formatNotificationUtcForDisplay(notification),
-      airportIcao: actualAirportIcao,
-      notificationAirportIcao: parsed.airportIcao,
-      stationSequence:
-        flightPlan ? null : stationSequence,
-      legSequence: legSequence || null,
-      isFlightPlan: flightPlan
-    };
-
-    const current = latestMap[key];
-
-    if (
-      !current ||
-      getNotificationTimeValue(normalized) >
-        getNotificationTimeValue(current)
-    ) {
-      latestMap[key] = normalized;
-    }
-  });
-
-  return Object.keys(latestMap)
-    .map(function (key) {
-      return latestMap[key];
+    })
+    .map(function (notification) {
+      return {
+        id: notification.id || '',
+        locationLabel: notification.locationLabel || notification.stationAirport || '',
+        title: notification.serviceName || '',
+        serviceName: notification.serviceName || '',
+        serviceKey: notification.serviceKey || '',
+        status: normalizeUpdateStatus(notification.status),
+        createdAt: notification.createdAt || '',
+        createdAtUtc: notification.createdAtUtc ? notification.createdAtUtc + 'Z' : '',
+        airportIcao: notification.stationAirport || '',
+        stationSequence: notification.stationSequence || null,
+        legSequence: notification.targetLegSequence || null,
+        isFlightPlan: notification.isFlightPlan === true
+      };
     })
     .sort(function (a, b) {
-      return (
-        getNotificationTimeValue(b) -
-        getNotificationTimeValue(a)
-      );
+      return getNotificationTimeValue(b) - getNotificationTimeValue(a);
     });
 }
+
 
 function getNotificationTitleClass(
   title
