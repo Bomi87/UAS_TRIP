@@ -855,7 +855,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbxJ9Zu64rIilGRFAZ7Gv7FzqFj8J77zsbNlLAy2UvpoPIAZ7dObltg4tRUnhwjsQRMXWw/exec';
+      'https://script.google.com/macros/s/AKfycbxywBO4ANCQyJsxFlpCu9yyX7n_Rwn9hYD9fZFuuSL4NxcktZBjTL-FeCvp5iCEAaig0Q/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -1618,6 +1618,76 @@ function formatNotificationUtcForDisplay(item) {
 }
 
 
+function buildRouteStations(trip) {
+  const legs =
+    Array.isArray(trip && trip.legs)
+      ? trip.legs.slice()
+      : [];
+
+  legs.sort(function (a, b) {
+    return (
+      Number(a && a.sequence ? a.sequence : 0) -
+      Number(b && b.sequence ? b.sequence : 0)
+    );
+  });
+
+  const stations = [];
+
+  legs.forEach(function (routeLeg, index) {
+    const departure =
+      String(
+        routeLeg && routeLeg.departureIcao
+          ? routeLeg.departureIcao
+          : ''
+      )
+        .trim()
+        .toUpperCase();
+
+    const arrival =
+      String(
+        routeLeg && routeLeg.arrivalIcao
+          ? routeLeg.arrivalIcao
+          : ''
+      )
+        .trim()
+        .toUpperCase();
+
+    if (index === 0 && departure) {
+      stations.push(departure);
+    }
+
+    if (arrival) {
+      stations.push(arrival);
+    }
+  });
+
+  return stations;
+}
+
+
+function getStationForSequence(
+  routeStations,
+  sequence
+) {
+  const stationSequence =
+    Number(sequence || 0);
+
+  if (
+    !stationSequence ||
+    stationSequence < 1 ||
+    stationSequence > routeStations.length
+  ) {
+    return '';
+  }
+
+  return String(
+    routeStations[stationSequence - 1] || ''
+  )
+    .trim()
+    .toUpperCase();
+}
+
+
 function getLegUpdates(trip, leg) {
   const tripNumber =
     String(
@@ -1653,6 +1723,25 @@ function getLegUpdates(trip, leg) {
         : 0
     );
 
+  const routeStations =
+    buildRouteStations(trip);
+
+  /*
+   * 화면의 각 LEG에는 도착 Station을 연결합니다.
+   *
+   * LEG 1 RKSS-PANC  -> Station 2 PANC
+   * LEG 2 PANC-KTEB  -> Station 3 KTEB
+   * LEG 3 KTEB-KSJC  -> Station 4 KSJC
+   *
+   * 따라서:
+   * PPR 3-KSJC/SJC      -> Station 3 KTEB
+   * Handling 4-KSJC/SJC -> Station 4 KSJC
+   */
+  const arrivalStationSequence =
+    legSequence > 0
+      ? legSequence + 1
+      : 0;
+
   const latestMap = {};
 
   state.notifications.forEach(function (
@@ -1680,24 +1769,14 @@ function getLegUpdates(trip, leg) {
         notification.originalTitle ||
         notification.title
       );
-if (
-  /^New service\s+.+\s+added$/i.test(
-    parsed.displayTitle
-  ) ||
-  /\bremoved$/i.test(
-    parsed.displayTitle
-  )
-) {
-  return;
-}
-    if (!parsed.airportIcao) {
-      return;
-    }
 
     if (
-      parsed.sequenceHint &&
-      legSequence &&
-      parsed.sequenceHint !== legSequence
+      /^New service\s+.+\s+added$/i.test(
+        parsed.displayTitle
+      ) ||
+      /\bremoved$/i.test(
+        parsed.displayTitle
+      )
     ) {
       return;
     }
@@ -1705,39 +1784,99 @@ if (
     const flightPlan =
       isFlightPlanUpdate(parsed);
 
-    /*
-     * Flight Plan 계열:
-     * 알림의 공항을 출발공항으로 보고 해당 LEG에 연결
-     *
-     * 일반 서비스:
-     * 도착공항 기준으로만 해당 LEG에 연결
-     */
+    let locationLabel = '';
+    let actualAirportIcao = '';
+    let key = '';
+
     if (flightPlan) {
-      if (parsed.airportIcao !== departure) {
+      /*
+       * Flight Plan 계열 숫자는 기존과 같이 LEG 번호로 처리합니다.
+       * 제목 공항은 해당 LEG 출발공항과 일치해야 합니다.
+       */
+      if (
+        parsed.sequenceHint &&
+        legSequence &&
+        parsed.sequenceHint !== legSequence
+      ) {
         return;
       }
+
+      if (
+        parsed.airportIcao &&
+        parsed.airportIcao !== departure
+      ) {
+        return;
+      }
+
+      actualAirportIcao = departure;
+      locationLabel =
+        departure + ' - ' + arrival;
+
+      key = [
+        'FLIGHT',
+        legSequence,
+        parsed.serviceKey
+      ].join('|');
+
+    } else if (parsed.sequenceHint) {
+      /*
+       * 일반 서비스의 숫자는 전체 ROUTE의 Station 순번입니다.
+       * 제목 뒤 공항코드는 서비스 위치 판정에 사용하지 않습니다.
+       *
+       * 예:
+       * 3-KSJC/SJC -> Station 3 = KTEB
+       * 4-KSJC/SJC -> Station 4 = KSJC
+       */
+      if (
+        !arrivalStationSequence ||
+        parsed.sequenceHint !==
+          arrivalStationSequence
+      ) {
+        return;
+      }
+
+      actualAirportIcao =
+        getStationForSequence(
+          routeStations,
+          parsed.sequenceHint
+        );
+
+      if (!actualAirportIcao) {
+        return;
+      }
+
+      locationLabel =
+        actualAirportIcao;
+
+      key = [
+        'STATION',
+        parsed.sequenceHint,
+        actualAirportIcao,
+        parsed.serviceKey
+      ].join('|');
+
     } else {
-      if (parsed.airportIcao !== arrival) {
+      /*
+       * 숫자가 없는 예전 알림은 기존 방식대로
+       * 제목의 공항코드와 도착공항을 비교합니다.
+       */
+      if (
+        !parsed.airportIcao ||
+        parsed.airportIcao !== arrival
+      ) {
         return;
       }
+
+      actualAirportIcao = arrival;
+      locationLabel = arrival;
+
+      key = [
+        'GROUND-FALLBACK',
+        arrivalStationSequence,
+        actualAirportIcao,
+        parsed.serviceKey
+      ].join('|');
     }
-
-    const locationLabel =
-      flightPlan
-        ? departure + ' - ' + arrival
-        : arrival;
-
-    const key =
-      flightPlan
-        ? [
-            'FLIGHT',
-            parsed.serviceKey
-          ].join('|')
-        : [
-            'GROUND',
-            parsed.airportIcao,
-            parsed.serviceKey
-          ].join('|');
 
     const normalized = {
       id:
@@ -1767,7 +1906,22 @@ if (
         ),
 
       airportIcao:
+        actualAirportIcao,
+
+      notificationAirportIcao:
         parsed.airportIcao,
+
+      stationSequence:
+        flightPlan
+          ? null
+          : (
+              parsed.sequenceHint ||
+              arrivalStationSequence ||
+              null
+            ),
+
+      legSequence:
+        legSequence || null,
 
       isFlightPlan:
         flightPlan
@@ -1800,7 +1954,6 @@ if (
       );
     });
 }
-
 
 function getNotificationTitleClass(
   title
