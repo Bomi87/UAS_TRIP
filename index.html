@@ -859,7 +859,7 @@
   let GTMX_APP_STARTED = false;
 
   const BRIEF_LOCAL_CACHE_KEY =
-    'GTMX_FLIGHT_BRIEF_CACHE_V3';
+    'GTMX_FLIGHT_BRIEF_CACHE_V4';
 
   const BRIEF_LOCAL_CACHE_MAX_AGE_MS =
     35 * 60 * 1000;
@@ -1252,57 +1252,56 @@ async function loadBriefServices(
         return;
       }
 
-      restoreBriefServicesFromLocalCache();
-      setBusy(true);
+ async function refreshDashboard() {
+  if (state.busy) {
+    return;
+  }
 
-      try {
-        writeLog('현황 조회 시작', {
-          actions: ['trips', 'list', 'briefs']
+  setBusy(true);
+
+  try {
+    writeLog('현황 조회 시작', {
+      actions: ['trips', 'list', 'briefs']
+    });
+
+    const briefPromise =
+      loadBriefServices(false)
+        .catch(function (error) {
+          console.error(
+            'Flight Brief preload failed:',
+            error
+          );
+
+          writeLog(
+            'Flight Brief 사전 조회 실패',
+            { error: error.message }
+          );
+
+          return {
+            success: false,
+            error: error.message
+          };
         });
 
-        /*
-         * 세 요청을 동시에 시작합니다.
-         * Flight Brief 실패는 Trip/PDF 목록 표시를 막지 않습니다.
-         */
-        const briefPromise =
-          loadBriefServices(false)
-            .catch(function (error) {
-              console.error(
-                'Flight Brief preload failed:',
-                error
-              );
+    const results = await Promise.all([
+      loadTrips(),
+      loadFiles(),
+      briefPromise
+    ]);
 
-              writeLog(
-                'Flight Brief 사전 조회 실패',
-                { error: error.message }
-              );
+    writeLog('현황 조회 완료', results);
 
-              return {
-                success: false,
-                error: error.message
-              };
-            });
+  } catch (error) {
+    writeLog('현황 조회 실패', {
+      error: error.message
+    });
 
-        const results = await Promise.all([
-          loadTrips(),
-          loadFiles(),
-          briefPromise
-        ]);
+    alert(error.message);
 
-        writeLog('현황 조회 완료', results);
-
-      } catch (error) {
-        writeLog('현황 조회 실패', {
-          error: error.message
-        });
-
-        alert(error.message);
-
-      } finally {
-        setBusy(false);
-      }
-    }
-
+  } finally {
+    setBusy(false);
+  }
+}
     /**
      * 앱을 열 때 자동 실행
      *
