@@ -1314,48 +1314,72 @@ async function loadBriefServices(
    
 
 
-    async function runSync() {
-      if (state.busy) {
-        return;
-      }
+async function runSync() {
+  if (state.busy) {
+    return;
+  }
 
-      const confirmed = window.confirm(
-        'Active Trip의 최신 PDF를 지금 동기화할까요?'
+  const confirmed = window.confirm(
+    'Active Trip의 PDF와 ROUTE 정보를 지금 동기화할까요?'
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  setBusy(true);
+
+  try {
+    writeLog('전체 동기화 시작', {
+      action: 'sync'
+    });
+
+    const result =
+      await callBackend('sync');
+
+    writeLog('전체 동기화 완료', result);
+
+    /*
+     * 백엔드 sync에서 이미 최신 ROUTE 캐시까지 생성했으므로
+     * 프론트의 기존 메모리 및 브라우저 캐시만 비웁니다.
+     */
+    state.briefServices = [];
+    state.briefServicesByTripLeg =
+      Object.create(null);
+    state.briefCacheGeneratedAt = '';
+
+    try {
+      window.localStorage.removeItem(
+        BRIEF_LOCAL_CACHE_KEY
       );
-
-      if (!confirmed) {
-        return;
-      }
-
-      setBusy(true);
-
-      try {
-        writeLog('동기화 시작', {
-          action: 'sync'
-        });
-
-        const result =
-          await callBackend('sync');
-
-        writeLog('동기화 완료', result);
-
-        await Promise.all([
-          loadTrips(),
-          loadFiles(),
-          loadBriefServices(true)
-        ]);
-
-      } catch (error) {
-        writeLog('동기화 실패', {
-          error: error.message
-        });
-
-        alert(error.message);
-
-      } finally {
-        setBusy(false);
-      }
+    } catch (error) {
+      console.warn(
+        'Flight Brief local cache clear failed:',
+        error
+      );
     }
+
+    /*
+     * refresh=1로 GTMx API를 재호출하지 않고,
+     * sync가 방금 생성한 캐시를 읽습니다.
+     */
+    await Promise.all([
+      loadTrips(),
+      loadFiles(),
+      loadBriefServices(false)
+    ]);
+
+  } catch (error) {
+    writeLog('전체 동기화 실패', {
+      error: error.message
+    });
+
+    alert(error.message);
+
+  } finally {
+    setBusy(false);
+  }
+}
 
     async function downloadTrip() {
       if (state.busy) {
