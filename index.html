@@ -854,12 +854,12 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbxmMV35tbT4m_pvfINSe9EtYy1fdzYmZtrd56EOEnC7hWRyJgrrI3i3Nok6_xrH_Pb7WQ/exec';
+      'https://script.google.com/macros/s/AKfycbzQRTkeMF2l3AG51lHQFlq2_2Jx-kvu5vTv8wqyh7oQJJtYRSfLNE7Khtvhdlo9udNsKw/exec';
 
   let GTMX_APP_STARTED = false;
 
   const BRIEF_LOCAL_CACHE_KEY =
-    'GTMX_FLIGHT_BRIEF_CACHE_V4';
+    'GTMX_FLIGHT_BRIEF_CACHE_V3';
 
   const BRIEF_LOCAL_CACHE_MAX_AGE_MS =
     35 * 60 * 1000;
@@ -1252,56 +1252,57 @@ async function loadBriefServices(
         return;
       }
 
- async function refreshDashboard() {
-  if (state.busy) {
-    return;
-  }
+      restoreBriefServicesFromLocalCache();
+      setBusy(true);
 
-  setBusy(true);
-
-  try {
-    writeLog('현황 조회 시작', {
-      actions: ['trips', 'list', 'briefs']
-    });
-
-    const briefPromise =
-      loadBriefServices(false)
-        .catch(function (error) {
-          console.error(
-            'Flight Brief preload failed:',
-            error
-          );
-
-          writeLog(
-            'Flight Brief 사전 조회 실패',
-            { error: error.message }
-          );
-
-          return {
-            success: false,
-            error: error.message
-          };
+      try {
+        writeLog('현황 조회 시작', {
+          actions: ['trips', 'list', 'briefs']
         });
 
-    const results = await Promise.all([
-      loadTrips(),
-      loadFiles(),
-      briefPromise
-    ]);
+        /*
+         * 세 요청을 동시에 시작합니다.
+         * Flight Brief 실패는 Trip/PDF 목록 표시를 막지 않습니다.
+         */
+        const briefPromise =
+          loadBriefServices(false)
+            .catch(function (error) {
+              console.error(
+                'Flight Brief preload failed:',
+                error
+              );
 
-    writeLog('현황 조회 완료', results);
+              writeLog(
+                'Flight Brief 사전 조회 실패',
+                { error: error.message }
+              );
 
-  } catch (error) {
-    writeLog('현황 조회 실패', {
-      error: error.message
-    });
+              return {
+                success: false,
+                error: error.message
+              };
+            });
 
-    alert(error.message);
+        const results = await Promise.all([
+          loadTrips(),
+          loadFiles(),
+          briefPromise
+        ]);
 
-  } finally {
-    setBusy(false);
-  }
-}
+        writeLog('현황 조회 완료', results);
+
+      } catch (error) {
+        writeLog('현황 조회 실패', {
+          error: error.message
+        });
+
+        alert(error.message);
+
+      } finally {
+        setBusy(false);
+      }
+    }
+
     /**
      * 앱을 열 때 자동 실행
      *
@@ -1651,6 +1652,38 @@ function getLegUpdates(trip, leg) {
 
   return indexedRecords
     .map(function (record) {
+      const baseServiceName =
+        String(
+          record.serviceName || ''
+        ).trim();
+
+      const serviceReference =
+        String(
+          record.serviceReference || ''
+        ).trim();
+
+      /*
+       * 허가 관련 서비스는 GTMx Service Reference가 있을 때
+       * 서비스명 뒤에 괄호로 번호를 표시합니다.
+       * TSA Waiver는 대상에서 제외합니다.
+       */
+      const isPermissionService =
+        /(?:\bPPR\b|Permit|Permission|Landing Rights)/i.test(
+          baseServiceName
+        ) &&
+        !/TSA\s*Waiver/i.test(
+          baseServiceName
+        );
+
+      const displayServiceName =
+        isPermissionService &&
+        serviceReference
+          ? baseServiceName +
+            ' (' +
+            serviceReference +
+            ')'
+          : baseServiceName;
+
       return {
         id: [
           record.tripNumber || '',
@@ -1664,8 +1697,8 @@ function getLegUpdates(trip, leg) {
           record.locationLabel ||
           record.stationAirport ||
           '',
-        title: record.serviceName || '',
-        serviceName: record.serviceName || '',
+        title: displayServiceName,
+        serviceName: displayServiceName,
         serviceKey: record.serviceKey || '',
         status: normalizeUpdateStatus(record.status),
         createdAt: '',
