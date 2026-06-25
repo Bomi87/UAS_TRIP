@@ -2297,57 +2297,37 @@ function closeRouteModal(event) {
 );
 
 function startGtmxAppAfterAuth() {
-  if (GTMX_APP_STARTED) {
-    return;
-  }
-
+  if (GTMX_APP_STARTED) return;
   GTMX_APP_STARTED = true;
 
-  const authScreen =
-    document.getElementById('authScreen');
+  const authScreen = document.getElementById('authScreen');
+  const appRoot = document.getElementById('appRoot');
 
-  const appRoot =
-    document.getElementById('appRoot');
-
-  // 승인 확인 문구 숨기기
   if (authScreen) {
     authScreen.style.display = 'none';
   }
 
-  // 실제 앱 화면 표시
   if (appRoot) {
     appRoot.style.display = 'block';
   }
 
-  // 인증 완료 후 데이터 동기화 시작
-refreshDashboard();
+  refreshDashboard();
 }
 
 (function waitForPortalAuth() {
-  // 이전에 이미 Google 계정 승인을 받은 세션
-  if (
-    sessionStorage.getItem('portalApproved') === 'true'
-  ) {
+  // 1) 포털에서 이미 승인된 Gmail 계정 세션이면 앱 시작
+  if (sessionStorage.getItem('portalApproved') === 'true') {
     startGtmxAppAfterAuth();
-    return;
   }
 
-  // common-auth.js에서 Google 계정 승인이 완료된 경우
+  // 2) common-auth.js가 승인 계정임을 최종 확인한 경우에만 통과
   if (window.CURRENT_PORTAL_USER) {
-    sessionStorage.setItem(
-      'portalApproved',
-      'true'
-    );
-
+    sessionStorage.setItem('portalApproved', 'true');
     startGtmxAppAfterAuth();
     return;
   }
 
-  // 아직 인증 결과가 없으면 잠시 후 다시 확인
-  window.setTimeout(
-    waitForPortalAuth,
-    200
-  );
+  window.setTimeout(waitForPortalAuth, 200);
 })();
   </script>
 
