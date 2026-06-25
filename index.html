@@ -863,6 +863,18 @@
   const BRIEF_LOCAL_CACHE_MAX_AGE_MS =
     35 * 60 * 1000;
 
+    /*
+ * PDF를 열었다가 모바일 앱으로 돌아올 때
+ * 화면을 빠르게 복원하기 위한 세션 캐시입니다.
+ *
+ * 브라우저/앱 세션이 종료되면 자동으로 사라집니다.
+ */
+const DASHBOARD_SESSION_CACHE_KEY =
+  'GTMX_DASHBOARD_SESSION_CACHE_V1';
+
+const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
+  5 * 60 * 1000;
+
   const state = {
     busy: false,
     activeTrips: [],
@@ -1095,6 +1107,138 @@ function buildBriefServiceIndex(records) {
   return index;
 }
 
+function saveDashboardToSessionCache() {
+  try {
+    window.sessionStorage.setItem(
+      DASHBOARD_SESSION_CACHE_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+
+        activeTrips:
+          Array.isArray(state.activeTrips)
+            ? state.activeTrips
+            : [],
+
+        files:
+          Array.isArray(state.files)
+            ? state.files
+            : [],
+
+        briefServices:
+          Array.isArray(state.briefServices)
+            ? state.briefServices
+            : [],
+
+        briefCacheGeneratedAt:
+          state.briefCacheGeneratedAt || ''
+      })
+    );
+
+  } catch (error) {
+    console.warn(
+      'Dashboard session cache save failed:',
+      error
+    );
+  }
+}
+
+
+function restoreDashboardFromSessionCache() {
+  try {
+    const raw =
+      window.sessionStorage.getItem(
+        DASHBOARD_SESSION_CACHE_KEY
+      );
+
+    if (!raw) {
+      return false;
+    }
+
+    const cached =
+      JSON.parse(raw);
+
+    const savedAt =
+      Number(cached.savedAt || 0);
+
+    const age =
+      Date.now() - savedAt;
+
+    if (
+      !savedAt ||
+      age < 0 ||
+      age > DASHBOARD_SESSION_CACHE_MAX_AGE_MS
+    ) {
+      window.sessionStorage.removeItem(
+        DASHBOARD_SESSION_CACHE_KEY
+      );
+
+      return false;
+    }
+
+    state.activeTrips =
+      Array.isArray(cached.activeTrips)
+        ? cached.activeTrips
+        : [];
+
+    state.files =
+      Array.isArray(cached.files)
+        ? cached.files
+        : [];
+
+    state.briefServices =
+      Array.isArray(cached.briefServices)
+        ? cached.briefServices
+        : [];
+
+    state.briefServicesByTripLeg =
+      buildBriefServiceIndex(
+        state.briefServices
+      );
+
+    state.briefCacheGeneratedAt =
+      cached.briefCacheGeneratedAt || '';
+
+    renderTrips(
+      state.activeTrips
+    );
+
+    renderFiles(
+      state.files
+    );
+
+    console.log(
+      'Dashboard restored from session cache:',
+      {
+        ageSeconds:
+          Math.round(age / 1000),
+
+        trips:
+          state.activeTrips.length,
+
+        files:
+          state.files.length,
+
+        briefs:
+          state.briefServices.length
+      }
+    );
+
+    return true;
+
+  } catch (error) {
+    console.warn(
+      'Dashboard session cache restore failed:',
+      error
+    );
+
+    window.sessionStorage.removeItem(
+      DASHBOARD_SESSION_CACHE_KEY
+    );
+
+    return false;
+  }
+}
+    
 function saveBriefServicesToLocalCache(
   records,
   generatedAt
@@ -1251,7 +1395,6 @@ async function loadBriefServices(
         return;
       }
 
-      restoreBriefServicesFromLocalCache();
       setBusy(true);
 
       try {
@@ -1289,6 +1432,7 @@ async function loadBriefServices(
         ]);
 
         writeLog('현황 조회 완료', results);
+        saveDashboardToSessionCache();
 
       } catch (error) {
         writeLog('현황 조회 실패', {
@@ -1361,11 +1505,13 @@ async function runSync() {
      * refresh=1로 GTMx API를 재호출하지 않고,
      * sync가 방금 생성한 캐시를 읽습니다.
      */
-    await Promise.all([
-      loadTrips(),
-      loadFiles(),
-      loadBriefServices(false)
-    ]);
+await Promise.all([
+  loadTrips(),
+  loadFiles(),
+  loadBriefServices(false)
+]);
+
+saveDashboardToSessionCache();
 
   } catch (error) {
     writeLog('전체 동기화 실패', {
@@ -1412,6 +1558,7 @@ async function runSync() {
         writeLog('수동 다운로드 완료', result);
 
         await loadFiles();
+        saveDashboardToSessionCache();
 
         if (result.driveUrl) {
           window.open(
@@ -2297,11 +2444,17 @@ function closeRouteModal(event) {
 );
 
 function startGtmxAppAfterAuth() {
-  if (GTMX_APP_STARTED) return;
+  if (GTMX_APP_STARTED) {
+    return;
+  }
+
   GTMX_APP_STARTED = true;
 
-  const authScreen = document.getElementById('authScreen');
-  const appRoot = document.getElementById('appRoot');
+  const authScreen =
+    document.getElementById('authScreen');
+
+  const appRoot =
+    document.getElementById('appRoot');
 
   if (authScreen) {
     authScreen.style.display = 'none';
@@ -2311,23 +2464,44 @@ function startGtmxAppAfterAuth() {
     appRoot.style.display = 'block';
   }
 
-  refreshDashboard();
+  const restored =
+    restoreDashboardFromSessionCache();
+
+  if (!restored) {
+    refreshDashboard();
+  }
 }
 
 (function waitForPortalAuth() {
-  // 1) 포털에서 이미 승인된 Gmail 계정 세션이면 앱 시작
-  if (sessionStorage.getItem('portalApproved') === 'true') {
-    startGtmxAppAfterAuth();
-  }
-
-  // 2) common-auth.js가 승인 계정임을 최종 확인한 경우에만 통과
-  if (window.CURRENT_PORTAL_USER) {
-    sessionStorage.setItem('portalApproved', 'true');
+  /*
+   * 같은 브라우저 세션에서 이미 승인된 경우
+   */
+  if (
+    sessionStorage.getItem(
+      'portalApproved'
+    ) === 'true'
+  ) {
     startGtmxAppAfterAuth();
     return;
   }
 
-  window.setTimeout(waitForPortalAuth, 200);
+  /*
+   * common-auth.js가 승인 사용자를 확인한 경우
+   */
+  if (window.CURRENT_PORTAL_USER) {
+    sessionStorage.setItem(
+      'portalApproved',
+      'true'
+    );
+
+    startGtmxAppAfterAuth();
+    return;
+  }
+
+  window.setTimeout(
+    waitForPortalAuth,
+    200
+  );
 })();
   </script>
 
