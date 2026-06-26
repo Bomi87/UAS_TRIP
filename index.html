@@ -744,17 +744,13 @@
         <div class="card-header-row">
           <h2>Active Trip</h2>
 
-          <button
-            class="btn success"
-            id="syncButton"
-            type="button"
-          >
-            새로고침
-          </button>
+          <span class="hero-badge" id="lastUpdatedBadge">
+            15분 자동 갱신
+          </span>
         </div>
 
         <p class="card-subtitle">
-          *Route: 스케줄 및 Status 확인 / InProgress: UAS Breifing pdf
+          *Route: 스케줄 및 Status 확인 / 데이터는 15분마다 자동 갱신
         </p>
 
         <div class="table-wrap">
@@ -870,7 +866,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbzQRTkeMF2l3AG51lHQFlq2_2Jx-kvu5vTv8wqyh7oQJJtYRSfLNE7Khtvhdlo9udNsKw/exec';
+      'https://script.google.com/macros/s/AKfycbxz0VqdiUueCci6zbc4sJugLIPQ7mVLNJCDclKr2s8OmQjrJxY-S1s5kBZNSBHgSC_QNw/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -890,7 +886,7 @@ const DASHBOARD_SESSION_CACHE_KEY =
   'GTMX_DASHBOARD_SESSION_CACHE_V1';
 
 const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
-  5 * 60 * 1000;
+  20 * 60 * 1000;
 
   const state = {
     busy: false,
@@ -899,7 +895,8 @@ const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
     briefServices: [],
     briefServicesByTripLeg: Object.create(null),
     briefServicesPromise: null,
-    briefCacheGeneratedAt: ''
+    briefCacheGeneratedAt: '',
+    dashboardGeneratedAt: ''
   };
 
   const elements = {
@@ -912,8 +909,8 @@ const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
     routeModalBody:
       document.getElementById('routeModalBody'),
 
-    syncButton:
-      document.getElementById('syncButton'),
+    lastUpdatedBadge:
+      document.getElementById('lastUpdatedBadge'),
 
     downloadButton:
       document.getElementById('downloadButton'),
@@ -951,7 +948,6 @@ const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
       state.busy = isBusy;
 
       [
-        elements.syncButton,
         elements.downloadButton
       ].forEach(function (button) {
         button.disabled = isBusy;
@@ -1059,17 +1055,53 @@ const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
         document.head.appendChild(script);
       });
     }
-    async function loadTrips() {
+    async function loadDashboardSnapshot() {
       const result =
-        await callBackend('trips');
+        await callBackend('dashboard');
 
       state.activeTrips =
         Array.isArray(result.activeTrips)
           ? result.activeTrips
           : [];
 
-      renderTrips(
-        state.activeTrips
+      state.files =
+        Array.isArray(result.files)
+          ? result.files
+          : [];
+
+      state.briefServices =
+        Array.isArray(result.records)
+          ? result.records
+          : [];
+
+      state.briefServicesByTripLeg =
+        buildBriefServiceIndex(
+          state.briefServices
+        );
+
+      state.briefCacheGeneratedAt =
+        result.briefCacheGeneratedAt ||
+        result.generatedAt ||
+        '';
+
+      state.dashboardGeneratedAt =
+        result.generatedAtLocal ||
+        result.generatedAt ||
+        '';
+
+      renderTrips(state.activeTrips);
+      renderFiles(state.files);
+
+      if (elements.lastUpdatedBadge) {
+        elements.lastUpdatedBadge.textContent =
+          state.dashboardGeneratedAt
+            ? '마지막 갱신 ' + state.dashboardGeneratedAt
+            : '15분 자동 갱신';
+      }
+
+      saveBriefServicesToLocalCache(
+        state.briefServices,
+        state.briefCacheGeneratedAt
       );
 
       return result;
@@ -1147,7 +1179,10 @@ function saveDashboardToSessionCache() {
             : [],
 
         briefCacheGeneratedAt:
-          state.briefCacheGeneratedAt || ''
+          state.briefCacheGeneratedAt || '',
+
+        dashboardGeneratedAt:
+          state.dashboardGeneratedAt || ''
       })
     );
 
@@ -1214,6 +1249,16 @@ function restoreDashboardFromSessionCache() {
 
     state.briefCacheGeneratedAt =
       cached.briefCacheGeneratedAt || '';
+
+    state.dashboardGeneratedAt =
+      cached.dashboardGeneratedAt || '';
+
+    if (elements.lastUpdatedBadge) {
+      elements.lastUpdatedBadge.textContent =
+        state.dashboardGeneratedAt
+          ? '마지막 갱신 ' + state.dashboardGeneratedAt
+          : '15분 자동 갱신';
+    }
 
     renderTrips(
       state.activeTrips
@@ -1415,44 +1460,24 @@ async function loadBriefServices(
       setBusy(true);
 
       try {
-        writeLog('현황 조회 시작', {
-          actions: ['trips', 'list', 'briefs']
+        writeLog('저장된 대시보드 조회 시작', {
+          action: 'dashboard'
         });
 
-        /*
-         * 세 요청을 동시에 시작합니다.
-         * Flight Brief 실패는 Trip/PDF 목록 표시를 막지 않습니다.
-         */
-        const briefPromise =
-          loadBriefServices(false)
-            .catch(function (error) {
-              console.error(
-                'Flight Brief preload failed:',
-                error
-              );
+        const result =
+          await loadDashboardSnapshot();
 
-              writeLog(
-                'Flight Brief 사전 조회 실패',
-                { error: error.message }
-              );
+        writeLog('저장된 대시보드 조회 완료', {
+          generatedAt: result.generatedAt || '',
+          activeTrips: state.activeTrips.length,
+          files: state.files.length,
+          briefs: state.briefServices.length
+        });
 
-              return {
-                success: false,
-                error: error.message
-              };
-            });
-
-        const results = await Promise.all([
-          loadTrips(),
-          loadFiles(),
-          briefPromise
-        ]);
-
-        writeLog('현황 조회 완료', results);
         saveDashboardToSessionCache();
 
       } catch (error) {
-        writeLog('현황 조회 실패', {
+        writeLog('저장된 대시보드 조회 실패', {
           error: error.message
         });
 
@@ -1473,74 +1498,6 @@ async function loadBriefServices(
    
 
 
-async function runSync() {
-  if (state.busy) {
-    return;
-  }
-
-  const confirmed = window.confirm(
-    'Active Trip의 PDF와 ROUTE 정보를 지금 동기화할까요?'
-  );
-
-  if (!confirmed) {
-    return;
-  }
-
-  setBusy(true);
-
-  try {
-    writeLog('전체 동기화 시작', {
-      action: 'sync'
-    });
-
-    const result =
-      await callBackend('sync');
-
-    writeLog('전체 동기화 완료', result);
-
-    /*
-     * 백엔드 sync에서 이미 최신 ROUTE 캐시까지 생성했으므로
-     * 프론트의 기존 메모리 및 브라우저 캐시만 비웁니다.
-     */
-    state.briefServices = [];
-    state.briefServicesByTripLeg =
-      Object.create(null);
-    state.briefCacheGeneratedAt = '';
-
-    try {
-      window.localStorage.removeItem(
-        BRIEF_LOCAL_CACHE_KEY
-      );
-    } catch (error) {
-      console.warn(
-        'Flight Brief local cache clear failed:',
-        error
-      );
-    }
-
-    /*
-     * refresh=1로 GTMx API를 재호출하지 않고,
-     * sync가 방금 생성한 캐시를 읽습니다.
-     */
-await Promise.all([
-  loadTrips(),
-  loadFiles(),
-  loadBriefServices(false)
-]);
-
-saveDashboardToSessionCache();
-
-  } catch (error) {
-    writeLog('전체 동기화 실패', {
-      error: error.message
-    });
-
-    alert(error.message);
-
-  } finally {
-    setBusy(false);
-  }
-}
 
     async function downloadTrip() {
       if (state.busy) {
@@ -1756,7 +1713,7 @@ const localToDateTime =
         alert(
           tripNumber +
           '의 저장된 Trip Document가 없습니다.\n' +
-          '먼저 새로고침을 실행하세요.'
+          '다음 15분 자동 갱신 후 다시 확인하세요.'
         );
 
         return;
@@ -2428,13 +2385,7 @@ function closeRouteModal(event) {
     function escapeAttribute(value) {
       return escapeHtml(value);
     }
-
-    elements.syncButton.addEventListener(
-      'click',
-      runSync
-    );
-
-    elements.downloadButton.addEventListener(
+elements.downloadButton.addEventListener(
       'click',
       downloadTrip
     );
