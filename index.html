@@ -899,6 +899,13 @@ const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
     dashboardGeneratedAt: ''
   };
 
+  // 백엔드는 15분마다 실제 데이터를 갱신합니다.
+  // 열려 있는 프론트는 1분마다 저장된 최신 스냅샷만 확인합니다.
+  const FRONTEND_SNAPSHOT_CHECK_MS =
+    60 * 1000;
+
+  let frontendSnapshotTimer = null;
+
   const elements = {
     routeModal:
       document.getElementById('routeModal'),
@@ -1055,6 +1062,19 @@ const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
         document.head.appendChild(script);
       });
     }
+    function updateLastUpdatedBadge() {
+      if (!elements.lastUpdatedBadge) {
+        return;
+      }
+
+      elements.lastUpdatedBadge.textContent =
+        state.dashboardGeneratedAt
+          ? 'Last updated: ' +
+            String(state.dashboardGeneratedAt).slice(0, 16)
+          : 'No last update time available';
+    }
+
+
     async function loadDashboardSnapshot() {
       const result =
         await callBackend('dashboard');
@@ -1092,12 +1112,7 @@ const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
       renderTrips(state.activeTrips);
       renderFiles(state.files);
 
-  if (elements.lastUpdatedBadge) {
-  elements.lastUpdatedBadge.textContent =
-    state.dashboardGeneratedAt
-      ? 'Last updated: ' + String(state.dashboardGeneratedAt).slice(0, 16)
-      : 'Auto refresh every 15 minutes';
-}
+    updateLastUpdatedBadge();
 
       saveBriefServicesToLocalCache(
         state.briefServices,
@@ -1253,12 +1268,7 @@ function restoreDashboardFromSessionCache() {
     state.dashboardGeneratedAt =
       cached.dashboardGeneratedAt || '';
 
-if (elements.lastUpdatedBadge) {
-  elements.lastUpdatedBadge.textContent =
-    state.dashboardGeneratedAt
-      ? 'Last updated: ' + String(state.dashboardGeneratedAt).slice(0, 16)
-      : 'Auto refresh every 15 minutes';
-}
+    updateLastUpdatedBadge();
 
     renderTrips(
       state.activeTrips
@@ -1452,41 +1462,111 @@ async function loadBriefServices(
     state.briefServicesPromise = null;
   }
 }
-    async function refreshDashboard() {
+    async function refreshDashboard(silent) {
       if (state.busy) {
-        return;
+        return false;
       }
 
       setBusy(true);
 
       try {
-        writeLog('저장된 대시보드 조회 시작', {
-          action: 'dashboard'
-        });
+        if (!silent) {
+          writeLog('저장된 대시보드 조회 시작', {
+            action: 'dashboard'
+          });
+        }
+
+        const previousGeneratedAt =
+          state.dashboardGeneratedAt || '';
 
         const result =
           await loadDashboardSnapshot();
 
-        writeLog('저장된 대시보드 조회 완료', {
-          generatedAt: result.generatedAt || '',
-          activeTrips: state.activeTrips.length,
-          files: state.files.length,
-          briefs: state.briefServices.length
-        });
+        if (!silent) {
+          writeLog('저장된 대시보드 조회 완료', {
+            generatedAt: result.generatedAt || '',
+            activeTrips: state.activeTrips.length,
+            files: state.files.length,
+            briefs: state.briefServices.length
+          });
+        }
 
         saveDashboardToSessionCache();
+
+        if (
+          silent &&
+          previousGeneratedAt &&
+          state.dashboardGeneratedAt &&
+          previousGeneratedAt !==
+            state.dashboardGeneratedAt
+        ) {
+          console.log(
+            'Dashboard snapshot updated:',
+            state.dashboardGeneratedAt
+          );
+        }
+
+        return true;
 
       } catch (error) {
         writeLog('저장된 대시보드 조회 실패', {
           error: error.message
         });
 
-        alert(error.message);
+        // 자동 확인 실패 시 기존 화면은 유지하고 경고창은 띄우지 않습니다.
+        if (!silent) {
+          alert(error.message);
+        } else {
+          console.warn(
+            'Automatic dashboard check failed:',
+            error
+          );
+        }
+
+        return false;
 
       } finally {
         setBusy(false);
       }
     }
+
+
+    function startFrontendSnapshotCheck() {
+      if (frontendSnapshotTimer) {
+        window.clearInterval(
+          frontendSnapshotTimer
+        );
+      }
+
+      frontendSnapshotTimer =
+        window.setInterval(function () {
+          if (
+            document.visibilityState !== 'visible' ||
+            state.busy
+          ) {
+            return;
+          }
+
+          refreshDashboard(true);
+        }, FRONTEND_SNAPSHOT_CHECK_MS);
+    }
+
+
+    function handleAppVisibilityChange() {
+      if (
+        document.visibilityState === 'visible' &&
+        GTMX_APP_STARTED &&
+        !state.busy
+      ) {
+        refreshDashboard(true);
+      }
+    }
+
+
+    document.addEventListener(
+      'visibilitychange',
+      handleAppVisibilityChange
+    );
 
     /**
      * 앱을 열 때 자동 실행
@@ -2436,8 +2516,10 @@ function startGtmxAppAfterAuth() {
     restoreDashboardFromSessionCache();
 
   if (!restored) {
-    refreshDashboard();
+    refreshDashboard(false);
   }
+
+  startFrontendSnapshotCheck();
 }
 
 (function waitForPortalAuth() {
