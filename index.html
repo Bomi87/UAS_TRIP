@@ -895,60 +895,130 @@
   text-align: center !important;
 }
 
-/* ===== POB 표 폭 및 잘림 수정 ===== */
-.pob-details {
-  width: 100%;
-  max-width: 100%;
-  overflow: hidden;
+/* ===== POB 표 PC 전체 컬럼 표시 / 모바일 스크롤 ===== */
+@media (min-width: 621px) {
+  .route-modal {
+    width: min(1180px, calc(100vw - 32px)) !important;
+  }
+
+  .route-modal-body {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .pob-details {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 40px !important;
+    margin-right: 0 !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    overflow: visible !important;
+  }
+
+  .pob-table-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: visible !important;
+  }
+
+  .pob-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+  }
+
+  .pob-table th,
+  .pob-table td {
+    padding: 8px 9px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pob-table th:nth-child(1),
+  .pob-table td:nth-child(1) {
+    width: 31% !important;
+  }
+
+  .pob-table th:nth-child(2),
+  .pob-table td:nth-child(2) {
+    width: 22% !important;
+  }
+
+  .pob-table th:nth-child(3),
+  .pob-table td:nth-child(3) {
+    width: 22% !important;
+  }
+
+  .pob-table th:nth-child(4),
+  .pob-table td:nth-child(4) {
+    width: 15% !important;
+  }
+
+  .pob-table th:nth-child(5),
+  .pob-table td:nth-child(5) {
+    width: 10% !important;
+    text-align: center !important;
+  }
 }
 
-.pob-table-wrap {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto !important;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-}
+@media (max-width: 620px) {
+  .pob-details {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
 
-.pob-table {
-  width: max-content !important;
-  min-width: 900px !important;
-  table-layout: auto !important;
-}
+  .pob-table-wrap {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
 
-.pob-table th,
-.pob-table td {
-  padding: 9px 9px !important;
-  font-size: .82rem !important;
-  white-space: nowrap !important;
-}
+  .pob-table {
+    width: max-content !important;
+    min-width: 900px !important;
+    table-layout: auto !important;
+  }
 
-.pob-table th:nth-child(1),
-.pob-table td:nth-child(1) {
-  min-width: 230px;
-}
+  .pob-table th,
+  .pob-table td {
+    padding: 9px 9px !important;
+    font-size: .82rem !important;
+    white-space: nowrap !important;
+  }
 
-.pob-table th:nth-child(2),
-.pob-table td:nth-child(2) {
-  min-width: 165px;
-}
+  .pob-table th:nth-child(1),
+  .pob-table td:nth-child(1) {
+    min-width: 230px;
+  }
 
-.pob-table th:nth-child(3),
-.pob-table td:nth-child(3) {
-  min-width: 170px;
-}
+  .pob-table th:nth-child(2),
+  .pob-table td:nth-child(2) {
+    min-width: 165px;
+  }
 
-.pob-table th:nth-child(4),
-.pob-table td:nth-child(4) {
-  min-width: 130px;
-}
+  .pob-table th:nth-child(3),
+  .pob-table td:nth-child(3) {
+    min-width: 170px;
+  }
 
-.pob-table th:nth-child(5),
-.pob-table td:nth-child(5) {
-  width: 68px !important;
-  min-width: 68px !important;
-  text-align: center !important;
+  .pob-table th:nth-child(4),
+  .pob-table td:nth-child(4) {
+    min-width: 130px;
+  }
+
+  .pob-table th:nth-child(5),
+  .pob-table td:nth-child(5) {
+    width: 68px !important;
+    min-width: 68px !important;
+    text-align: center !important;
+  }
 }
 
 /* ===== 모바일 전용 ===== */
