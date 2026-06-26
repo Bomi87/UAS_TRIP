@@ -337,7 +337,7 @@
 }
 
 .route-modal {
-  width: min(520px, 100%);
+  width: min(920px, 100%);
   max-height: 85vh;
   overflow: auto;
   background: white;
@@ -572,6 +572,12 @@
   line-height: 1.55;
 }
 
+.pob-summary-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 4px;
+}
+
 .pob-summary-button {
   display: inline-flex;
   align-items: center;
@@ -679,19 +685,37 @@
   }
 
   .route-row-side {
-    grid-column: 1 / -1;
-    width: 100%;
+    grid-column: auto;
+    width: auto;
     justify-content: flex-end;
-    margin-left: 0;
+    margin-left: auto;
+  }
+
+  .route-update-count {
+    min-width: 25px;
+    width: 25px;
+    padding: 0;
+    flex: 0 0 25px;
+  }
+
+  .pob-summary-row {
+    justify-content: flex-start;
+    padding: 0;
   }
 
   .pob-summary-button {
-    max-width: calc(100vw - 105px);
+    max-width: 100%;
     font-size: 10px;
   }
 
   .pob-details {
     margin-left: 0;
+    margin-right: 0;
+    padding: 10px;
+  }
+
+  .pob-table {
+    min-width: 700px;
   }
 }
 
@@ -827,7 +851,131 @@
     width: 100%;
   }
 }
-  </style>
+  
+/* ===== GTMx ROUTE mobile layout final fix ===== */
+.route-modal {
+  width: min(900px, calc(100vw - 24px));
+}
+
+.route-row {
+  grid-template-columns: 36px minmax(0, 1fr) auto !important;
+}
+
+.route-row-side {
+  display: inline-flex !important;
+  width: auto !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  justify-self: end !important;
+  align-self: center !important;
+  margin-left: 0 !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+}
+
+.route-update-count {
+  display: inline-flex !important;
+  width: 25px !important;
+  min-width: 25px !important;
+  max-width: 25px !important;
+  height: 25px !important;
+  padding: 0 !important;
+  flex: 0 0 25px !important;
+  border-radius: 999px !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.route-chevron {
+  display: inline-block !important;
+  width: 14px !important;
+  flex: 0 0 14px !important;
+  text-align: center !important;
+}
+
+.pob-details {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.pob-table-wrap {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pob-table {
+  width: max-content !important;
+  min-width: 760px !important;
+  table-layout: auto !important;
+}
+
+.pob-table th,
+.pob-table td {
+  white-space: nowrap !important;
+}
+
+.pob-table th:nth-child(1),
+.pob-table td:nth-child(1) {
+  min-width: 220px;
+}
+
+.pob-table th:nth-child(2),
+.pob-table td:nth-child(2) {
+  min-width: 150px;
+}
+
+.pob-table th:nth-child(3),
+.pob-table td:nth-child(3) {
+  min-width: 160px;
+}
+
+.pob-table th:nth-child(4),
+.pob-table td:nth-child(4) {
+  min-width: 130px;
+}
+
+@media (max-width: 620px) {
+  .route-modal {
+    width: calc(100vw - 12px);
+  }
+
+  .route-modal-body {
+    padding: 14px;
+  }
+
+  .route-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto !important;
+    gap: 9px !important;
+  }
+
+  .route-row-side {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+  }
+
+  .pob-summary-row {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .pob-details {
+    margin-left: 36px !important;
+    margin-right: 0 !important;
+  }
+
+  .pob-table {
+    min-width: 760px !important;
+  }
+}
+
+</style>
 </head>
 
 <body>
@@ -989,7 +1137,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbzQaL8kVlbT2Rrz1iUKCXVxgTnW78yY5u7ydwpLtW_Cy9TkrozBnqQXJSQdfUaxsWeACQ/exec';
+      'https://script.google.com/macros/s/AKfycbxNcauu0WfEmSzaZ7GoK2DVXUHNGQc_PHc2RElz_9EqUi-ohuUhBCKbn9l3jHMeAHOkTQ/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -2634,12 +2782,6 @@ async function openRouteModal(tripIndex) {
 
             '<span class="route-row-side">' +
 
-              renderPobSummaryButton(
-                leg,
-                tripIndex,
-                legIndex
-              ) +
-
               (
                 updates.length
                   ? '<span class="route-update-count">' +
@@ -2655,6 +2797,19 @@ async function openRouteModal(tripIndex) {
             '</span>' +
 
           '</button>' +
+
+          (
+            getLegPobInfo(leg).crewCount ||
+            getLegPobInfo(leg).paxCount
+              ? '<div class="pob-summary-row">' +
+                  renderPobSummaryButton(
+                    leg,
+                    tripIndex,
+                    legIndex
+                  ) +
+                '</div>'
+              : ''
+          ) +
 
           renderPobDetails(
             leg,
