@@ -1092,12 +1092,12 @@ const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
       renderTrips(state.activeTrips);
       renderFiles(state.files);
 
-      if (elements.lastUpdatedBadge) {
-        elements.lastUpdatedBadge.textContent =
-          state.dashboardGeneratedAt
-            ? '마지막 갱신 ' + state.dashboardGeneratedAt
-            : '15분 자동 갱신';
-      }
+  if (elements.lastUpdatedBadge) {
+  elements.lastUpdatedBadge.textContent =
+    state.dashboardGeneratedAt
+      ? 'Last updated: ' + String(state.dashboardGeneratedAt).slice(0, 16)
+      : 'Auto refresh every 15 minutes';
+}
 
       saveBriefServicesToLocalCache(
         state.briefServices,
@@ -1253,12 +1253,12 @@ function restoreDashboardFromSessionCache() {
     state.dashboardGeneratedAt =
       cached.dashboardGeneratedAt || '';
 
-    if (elements.lastUpdatedBadge) {
-      elements.lastUpdatedBadge.textContent =
-        state.dashboardGeneratedAt
-          ? '마지막 갱신 ' + state.dashboardGeneratedAt
-          : '15분 자동 갱신';
-    }
+if (elements.lastUpdatedBadge) {
+  elements.lastUpdatedBadge.textContent =
+    state.dashboardGeneratedAt
+      ? 'Last updated: ' + String(state.dashboardGeneratedAt).slice(0, 16)
+      : 'Auto refresh every 15 minutes';
+}
 
     renderTrips(
       state.activeTrips
