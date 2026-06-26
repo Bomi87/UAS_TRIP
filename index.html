@@ -912,7 +912,7 @@
 
 .pob-table {
   width: max-content !important;
-  min-width: 760px !important;
+  min-width: 840px !important;
   table-layout: auto !important;
 }
 
@@ -939,6 +939,12 @@
 .pob-table th:nth-child(4),
 .pob-table td:nth-child(4) {
   min-width: 130px;
+}
+
+.pob-table th:nth-child(5),
+.pob-table td:nth-child(5) {
+  min-width: 80px;
+  text-align: center;
 }
 
 @media (max-width: 620px) {
@@ -971,7 +977,7 @@
   }
 
   .pob-table {
-    min-width: 760px !important;
+    min-width: 840px !important;
   }
 }
 
@@ -1137,7 +1143,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbxNcauu0WfEmSzaZ7GoK2DVXUHNGQc_PHc2RElz_9EqUi-ohuUhBCKbn9l3jHMeAHOkTQ/exec';
+      'https://script.google.com/macros/s/AKfycbx3eRBdE2McsD4Rv2IzMh__MTs8FJOGqUfAI_eC4bVmRcGlsDCnE0mlN2OxztwlLw6DXQ/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -2149,7 +2155,7 @@ function renderPobRows(people) {
   if (!Array.isArray(people) || !people.length) {
     return (
       '<tr>' +
-        '<td colspan="4" class="empty">' +
+        '<td colspan="5" class="empty">' +
           'No assigned personnel' +
         '</td>' +
       '</tr>'
@@ -2168,9 +2174,9 @@ function renderPobRows(people) {
         '<td>' +
           escapeHtml(name || '-') +
           (
-            role && !/^passenger$/i.test(role)
+            /^pic$/i.test(role)
               ? '<span class="pob-role">' +
-                  escapeHtml(role) +
+                  'PIC' +
                 '</span>'
               : ''
           ) +
@@ -2187,6 +2193,9 @@ function renderPobRows(people) {
         '</td>' +
         '<td>' +
           escapeHtml(person.nationality || '-') +
+        '</td>' +
+        '<td>' +
+          escapeHtml(person.gender || '-') +
         '</td>' +
       '</tr>'
     );
@@ -2208,6 +2217,7 @@ function renderPobGroup(title, people) {
               '<th>Passport</th>' +
               '<th>Expiration Date</th>' +
               '<th>Nationality</th>' +
+              '<th>Gender</th>' +
             '</tr>' +
           '</thead>' +
           '<tbody>' +
