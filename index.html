@@ -895,6 +895,7 @@
   text-align: center !important;
 }
 
+/* ===== POB 표 폭 및 잘림 수정 ===== */
 .pob-details {
   width: 100%;
   max-width: 100%;
@@ -912,28 +913,30 @@
 
 .pob-table {
   width: max-content !important;
-  min-width: 840px !important;
+  min-width: 900px !important;
   table-layout: auto !important;
 }
 
 .pob-table th,
 .pob-table td {
+  padding: 9px 9px !important;
+  font-size: .82rem !important;
   white-space: nowrap !important;
 }
 
 .pob-table th:nth-child(1),
 .pob-table td:nth-child(1) {
-  min-width: 220px;
+  min-width: 230px;
 }
 
 .pob-table th:nth-child(2),
 .pob-table td:nth-child(2) {
-  min-width: 150px;
+  min-width: 165px;
 }
 
 .pob-table th:nth-child(3),
 .pob-table td:nth-child(3) {
-  min-width: 160px;
+  min-width: 170px;
 }
 
 .pob-table th:nth-child(4),
@@ -943,10 +946,12 @@
 
 .pob-table th:nth-child(5),
 .pob-table td:nth-child(5) {
-  min-width: 80px;
-  text-align: center;
+  width: 68px !important;
+  min-width: 68px !important;
+  text-align: center !important;
 }
 
+/* ===== 모바일 전용 ===== */
 @media (max-width: 620px) {
   .route-modal {
     width: calc(100vw - 12px);
@@ -974,10 +979,6 @@
   .pob-details {
     margin-left: 36px !important;
     margin-right: 0 !important;
-  }
-
-  .pob-table {
-    min-width: 840px !important;
   }
 }
 
