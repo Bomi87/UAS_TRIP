@@ -3077,26 +3077,9 @@ function startGtmxAppAfterAuth() {
 
 (function waitForPortalAuth() {
   /*
-   * 같은 브라우저 세션에서 이미 승인된 경우
-   */
-  if (
-    sessionStorage.getItem(
-      'portalApproved'
-    ) === 'true'
-  ) {
-    startGtmxAppAfterAuth();
-    return;
-  }
-
-  /*
-   * common-auth.js가 승인 사용자를 확인한 경우
+   * common-auth.js가 현재 앱 권한을 확인한 경우에만 실행
    */
   if (window.CURRENT_PORTAL_USER) {
-    sessionStorage.setItem(
-      'portalApproved',
-      'true'
-    );
-
     startGtmxAppAfterAuth();
     return;
   }
