@@ -899,7 +899,7 @@
 @media (min-width: 621px) {
   /* 6개 컬럼이 들어가되 화면 전체를 과도하게 넓히지 않습니다. */
   .route-modal {
-    width: min(1120px, calc(100vw - 32px)) !important;
+    width: min(1060px, calc(100vw - 32px)) !important;
   }
 
   .route-modal-body {
@@ -940,12 +940,12 @@
 
   .pob-table th:nth-child(1),
   .pob-table td:nth-child(1) {
-    width: 25% !important;
+    width: 28% !important;
   }
 
   .pob-table th:nth-child(2),
   .pob-table td:nth-child(2) {
-    width: 16% !important;
+    width: 17% !important;
   }
 
   .pob-table th:nth-child(3),
@@ -955,17 +955,19 @@
 
   .pob-table th:nth-child(4),
   .pob-table td:nth-child(4) {
-    width: 13% !important;
+    width: 15% !important;
   }
 
   .pob-table th:nth-child(5),
   .pob-table td:nth-child(5) {
-    width: 18% !important;
+    width: 15% !important;
   }
 
   .pob-table th:nth-child(6),
   .pob-table td:nth-child(6) {
-    width: 10% !important;
+    width: 7% !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
     text-align: center !important;
   }
 }
@@ -1060,6 +1062,34 @@
   .pob-details {
     margin-left: 36px !important;
     margin-right: 0 !important;
+  }
+}
+
+
+
+/* ===== ROUTE 팝업 PC 드래그 이동 ===== */
+@media (min-width: 821px) {
+  .route-modal {
+    position: relative;
+    will-change: transform;
+  }
+
+  .route-modal-head {
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+  }
+
+  .route-modal-head:active {
+    cursor: grabbing;
+  }
+
+  .route-modal.dragging {
+    transition: none !important;
+  }
+
+  .route-modal-close {
+    cursor: pointer;
   }
 }
 
@@ -1190,9 +1220,13 @@
 >
   <div
     class="route-modal"
+    id="routeModalPanel"
     onclick="event.stopPropagation()"
   >
-    <div class="route-modal-head">
+    <div
+      class="route-modal-head"
+      id="routeModalDragHandle"
+    >
       <h3
         class="route-modal-title"
         id="routeModalTitle"
@@ -1225,7 +1259,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbx0EV1GM3WcdTukZUYaa1QliMtsGPb0Ip6YTtTPCvK6uiuliN7heCNvlUzxQaYJCZn61A/exec';
+      'https://script.google.com/macros/s/AKfycbzTkhAysptokc9JU1xCHa2Zag6sWyNoQPok8QaiAhCid0j8WwLS7B8icJ4d7AbeZwvX3g/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -1268,6 +1302,12 @@ const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
   const elements = {
     routeModal:
       document.getElementById('routeModal'),
+
+    routeModalPanel:
+      document.getElementById('routeModalPanel'),
+
+    routeModalDragHandle:
+      document.getElementById('routeModalDragHandle'),
 
     routeModalTitle:
       document.getElementById('routeModalTitle'),
@@ -2692,6 +2732,170 @@ function toggleLegUpdates(
 }
 
 
+/* ===== ROUTE 팝업 PC 드래그 이동 ===== */
+const routeModalDragState = {
+  dragging: false,
+  pointerId: null,
+  startX: 0,
+  startY: 0,
+  originX: 0,
+  originY: 0,
+  currentX: 0,
+  currentY: 0
+};
+
+function applyRouteModalPosition_() {
+  if (!elements.routeModalPanel) {
+    return;
+  }
+
+  elements.routeModalPanel.style.transform =
+    'translate(' +
+    routeModalDragState.currentX +
+    'px, ' +
+    routeModalDragState.currentY +
+    'px)';
+}
+
+function resetRouteModalPosition_() {
+  routeModalDragState.dragging = false;
+  routeModalDragState.pointerId = null;
+  routeModalDragState.currentX = 0;
+  routeModalDragState.currentY = 0;
+
+  if (elements.routeModalPanel) {
+    elements.routeModalPanel.classList.remove('dragging');
+  }
+
+  applyRouteModalPosition_();
+}
+
+function clampRouteModalPosition_(x, y) {
+  if (!elements.routeModalPanel) {
+    return { x: 0, y: 0 };
+  }
+
+  const panelWidth =
+    elements.routeModalPanel.offsetWidth;
+  const panelHeight =
+    elements.routeModalPanel.offsetHeight;
+  const edgeGap = 12;
+
+  const maxX = Math.max(
+    0,
+    (window.innerWidth - panelWidth) / 2 - edgeGap
+  );
+
+  const maxY = Math.max(
+    0,
+    (window.innerHeight - panelHeight) / 2 - edgeGap
+  );
+
+  return {
+    x: Math.max(-maxX, Math.min(maxX, x)),
+    y: Math.max(-maxY, Math.min(maxY, y))
+  };
+}
+
+function initializeRouteModalDrag_() {
+  const panel = elements.routeModalPanel;
+  const handle = elements.routeModalDragHandle;
+
+  if (!panel || !handle) {
+    return;
+  }
+
+  handle.addEventListener('pointerdown', function (event) {
+    if (window.innerWidth <= 820) {
+      return;
+    }
+
+    if (event.button != null && event.button !== 0) {
+      return;
+    }
+
+    if (event.target.closest('.route-modal-close')) {
+      return;
+    }
+
+    routeModalDragState.dragging = true;
+    routeModalDragState.pointerId = event.pointerId;
+    routeModalDragState.startX = event.clientX;
+    routeModalDragState.startY = event.clientY;
+    routeModalDragState.originX = routeModalDragState.currentX;
+    routeModalDragState.originY = routeModalDragState.currentY;
+
+    panel.classList.add('dragging');
+    handle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+
+  handle.addEventListener('pointermove', function (event) {
+    if (
+      !routeModalDragState.dragging ||
+      routeModalDragState.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+
+    const proposedX =
+      routeModalDragState.originX +
+      event.clientX -
+      routeModalDragState.startX;
+
+    const proposedY =
+      routeModalDragState.originY +
+      event.clientY -
+      routeModalDragState.startY;
+
+    const clamped =
+      clampRouteModalPosition_(proposedX, proposedY);
+
+    routeModalDragState.currentX = clamped.x;
+    routeModalDragState.currentY = clamped.y;
+    applyRouteModalPosition_();
+  });
+
+  function stopDragging(event) {
+    if (
+      !routeModalDragState.dragging ||
+      routeModalDragState.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+
+    routeModalDragState.dragging = false;
+    routeModalDragState.pointerId = null;
+    panel.classList.remove('dragging');
+
+    if (handle.hasPointerCapture(event.pointerId)) {
+      handle.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  handle.addEventListener('pointerup', stopDragging);
+  handle.addEventListener('pointercancel', stopDragging);
+
+  window.addEventListener('resize', function () {
+    if (window.innerWidth <= 820) {
+      resetRouteModalPosition_();
+      return;
+    }
+
+    const clamped = clampRouteModalPosition_(
+      routeModalDragState.currentX,
+      routeModalDragState.currentY
+    );
+
+    routeModalDragState.currentX = clamped.x;
+    routeModalDragState.currentY = clamped.y;
+    applyRouteModalPosition_();
+  });
+}
+
+initializeRouteModalDrag_();
+
+
 async function openRouteModal(tripIndex) {
   const trip =
     state.activeTrips[tripIndex];
@@ -2699,6 +2903,8 @@ async function openRouteModal(tripIndex) {
   if (!trip) {
     return;
   }
+
+  resetRouteModalPosition_();
 
   elements.routeModalTitle.textContent =
     trip.tripNumber + ' ROUTE';
@@ -2950,6 +3156,8 @@ function closeRouteModal(event) {
   elements.routeModal.classList.remove(
     'open'
   );
+
+  resetRouteModalPosition_();
 }
     function renderFiles(files) {
       if (!files.length) {
