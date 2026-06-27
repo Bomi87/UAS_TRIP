@@ -895,31 +895,32 @@
   text-align: center !important;
 }
 
-/* ===== POB 표 PC 전체 컬럼 표시 / 모바일 스크롤 ===== */
+/* ===== POB 표 PC 압축 배치 / 모바일 스크롤 ===== */
 @media (min-width: 621px) {
+  /* 6개 컬럼이 들어가되 화면 전체를 과도하게 넓히지 않습니다. */
   .route-modal {
-    width: min(1380px, calc(100vw - 24px)) !important;
+    width: min(1120px, calc(100vw - 32px)) !important;
   }
 
   .route-modal-body {
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
   }
 
   .pob-details {
-    width: calc(100% - 40px) !important;
-    max-width: calc(100% - 40px) !important;
-    margin-left: 40px !important;
+    width: calc(100% - 36px) !important;
+    max-width: calc(100% - 36px) !important;
+    margin-left: 36px !important;
     margin-right: 0 !important;
-    padding-left: 10px !important;
-    padding-right: 10px !important;
-    overflow: visible !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    overflow: hidden !important;
   }
 
   .pob-table-wrap {
     width: 100% !important;
     max-width: 100% !important;
-    overflow-x: visible !important;
+    overflow-x: hidden !important;
   }
 
   .pob-table {
@@ -930,31 +931,31 @@
 
   .pob-table th,
   .pob-table td {
-    padding: 9px 10px !important;
-    font-size: 12px !important;
+    padding: 8px 7px !important;
+    font-size: 11px !important;
     white-space: nowrap !important;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   .pob-table th:nth-child(1),
   .pob-table td:nth-child(1) {
-    width: 24% !important;
+    width: 25% !important;
   }
 
   .pob-table th:nth-child(2),
   .pob-table td:nth-child(2) {
-    width: 17% !important;
+    width: 16% !important;
   }
 
   .pob-table th:nth-child(3),
   .pob-table td:nth-child(3) {
-    width: 17% !important;
+    width: 18% !important;
   }
 
   .pob-table th:nth-child(4),
   .pob-table td:nth-child(4) {
-    width: 14% !important;
+    width: 13% !important;
   }
 
   .pob-table th:nth-child(5),
@@ -1224,7 +1225,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbz_ot355C2iWjorGweodZ-0Dc7W2oMLn7kI3tYNgOR4OwB6FnpmmsJVWDXGkyazfDRnxQ/exec';
+      'https://script.google.com/macros/s/AKfycbx0EV1GM3WcdTukZUYaa1QliMtsGPb0Ip6YTtTPCvK6uiuliN7heCNvlUzxQaYJCZn61A/exec';
 
   let GTMX_APP_STARTED = false;
 
