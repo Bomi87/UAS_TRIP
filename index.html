@@ -898,7 +898,7 @@
 /* ===== POB 표 PC 전체 컬럼 표시 / 모바일 스크롤 ===== */
 @media (min-width: 621px) {
   .route-modal {
-    width: min(1180px, calc(100vw - 32px)) !important;
+    width: min(1380px, calc(100vw - 24px)) !important;
   }
 
   .route-modal-body {
@@ -907,8 +907,8 @@
   }
 
   .pob-details {
-    width: 100% !important;
-    max-width: 100% !important;
+    width: calc(100% - 40px) !important;
+    max-width: calc(100% - 40px) !important;
     margin-left: 40px !important;
     margin-right: 0 !important;
     padding-left: 10px !important;
@@ -930,7 +930,7 @@
 
   .pob-table th,
   .pob-table td {
-    padding: 8px 9px !important;
+    padding: 9px 10px !important;
     font-size: 12px !important;
     white-space: nowrap !important;
     overflow: hidden;
@@ -939,26 +939,31 @@
 
   .pob-table th:nth-child(1),
   .pob-table td:nth-child(1) {
-    width: 31% !important;
+    width: 24% !important;
   }
 
   .pob-table th:nth-child(2),
   .pob-table td:nth-child(2) {
-    width: 22% !important;
+    width: 17% !important;
   }
 
   .pob-table th:nth-child(3),
   .pob-table td:nth-child(3) {
-    width: 22% !important;
+    width: 17% !important;
   }
 
   .pob-table th:nth-child(4),
   .pob-table td:nth-child(4) {
-    width: 15% !important;
+    width: 14% !important;
   }
 
   .pob-table th:nth-child(5),
   .pob-table td:nth-child(5) {
+    width: 18% !important;
+  }
+
+  .pob-table th:nth-child(6),
+  .pob-table td:nth-child(6) {
     width: 10% !important;
     text-align: center !important;
   }
@@ -982,7 +987,7 @@
 
   .pob-table {
     width: max-content !important;
-    min-width: 900px !important;
+    min-width: 1040px !important;
     table-layout: auto !important;
   }
 
@@ -1015,6 +1020,11 @@
 
   .pob-table th:nth-child(5),
   .pob-table td:nth-child(5) {
+    min-width: 145px;
+  }
+
+  .pob-table th:nth-child(6),
+  .pob-table td:nth-child(6) {
     width: 68px !important;
     min-width: 68px !important;
     text-align: center !important;
@@ -1214,7 +1224,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbwnAUo8a05n3uKakLVJtLqtFLTgiw1fYhhH0q30xYV-Vn_qF9G3I4NFYJM-ZdorFS95qA/exec';
+      'https://script.google.com/macros/s/AKfycbz_ot355C2iWjorGweodZ-0Dc7W2oMLn7kI3tYNgOR4OwB6FnpmmsJVWDXGkyazfDRnxQ/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -2226,7 +2236,7 @@ function renderPobRows(people) {
   if (!Array.isArray(people) || !people.length) {
     return (
       '<tr>' +
-        '<td colspan="5" class="empty">' +
+        '<td colspan="6" class="empty">' +
           'No assigned personnel' +
         '</td>' +
       '</tr>'
@@ -2238,6 +2248,9 @@ function renderPobRows(people) {
     const role = String(person.role || '').trim();
     const expiry = String(
       person.passportExpiry || ''
+    ).trim();
+    const dateOfBirth = String(
+      person.dateOfBirth || ''
     ).trim();
 
     return (
@@ -2266,6 +2279,9 @@ function renderPobRows(people) {
           escapeHtml(person.nationality || '-') +
         '</td>' +
         '<td>' +
+          escapeHtml(dateOfBirth || '-') +
+        '</td>' +
+        '<td>' +
           escapeHtml(person.gender || '-') +
         '</td>' +
       '</tr>'
@@ -2288,6 +2304,7 @@ function renderPobGroup(title, people) {
               '<th>Passport</th>' +
               '<th>Expiration Date</th>' +
               '<th>Nationality</th>' +
+              '<th>Date of Birth</th>' +
               '<th>Gender</th>' +
             '</tr>' +
           '</thead>' +
