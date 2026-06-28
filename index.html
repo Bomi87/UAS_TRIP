@@ -1134,7 +1134,7 @@
           <h2>Active Trip</h2>
 
           <span class="hero-badge" id="lastUpdatedBadge">
-            15분 자동 갱신
+            30분 자동 갱신
           </span>
         </div>
 
@@ -1259,7 +1259,7 @@
   <script>
 
     const APPS_SCRIPT_WEB_APP_URL =
-      'https://script.google.com/macros/s/AKfycbxnXwhQo82mRiZMeq73zW_FlDg0Xn0kJ8Ph6VstJbNG5Qixw3DnIGYKy0n8VtYpjM3u/exec';
+      'https://script.google.com/macros/s/AKfycbzQHoW_R76Q7-ZOaw-2hGz5Rsvn4kAiOIOdUHxnTV3yfCVAW4XrSE60OH6Y4Gp8aY5EYQ/exec';
 
   let GTMX_APP_STARTED = false;
 
@@ -1292,10 +1292,10 @@ const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
     dashboardGeneratedAt: ''
   };
 
-  // 백엔드는 15분마다 실제 데이터를 갱신합니다.
-  // 열려 있는 프론트는 1분마다 저장된 최신 스냅샷만 확인합니다.
-  const FRONTEND_SNAPSHOT_CHECK_MS =
-    60 * 1000;
+  // 백엔드는 30분마다 실제 데이터를 갱신합니다.
+  // 열려 있는 프론트는 5분마다 저장된 최신 스냅샷만 확인합니다.
+const FRONTEND_SNAPSHOT_CHECK_MS =
+  5 * 60 * 1000;
 
   let frontendSnapshotTimer = null;
 
