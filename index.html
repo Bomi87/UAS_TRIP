@@ -2619,12 +2619,32 @@ function groupLegUpdates(updates) {
     const key =
       location + '|' + status;
 
+    const isOverflight =
+      String(update.serviceType || '')
+        .trim()
+        .toUpperCase() === 'OVF' ||
+      String(update.sourceType || '')
+        .trim()
+        .toUpperCase() ===
+          'GTMX_OVERFLIGHT_API' ||
+      /PERMIT\s*\(OVF\)/i.test(
+        String(
+          update.rawServiceName ||
+          update.serviceName ||
+          update.title ||
+          ''
+        )
+      );
+
     if (!grouped[key]) {
       grouped[key] = {
         location: location,
         status: status,
-        services: []
+        services: [],
+        isOverflight: isOverflight
       };
+    } else if (isOverflight) {
+      grouped[key].isOverflight = true;
     }
 
     if (
@@ -2644,6 +2664,22 @@ function groupLegUpdates(updates) {
       return grouped[key];
     })
     .sort(function (a, b) {
+      /*
+       * Overflight Permit 그룹을 공항 서비스 그룹보다
+       * 항상 먼저 표시합니다.
+       */
+      const groupOrder =
+        (a.isOverflight ? 0 : 1) -
+        (b.isOverflight ? 0 : 1);
+
+      if (groupOrder !== 0) {
+        return groupOrder;
+      }
+
+      /*
+       * 각 그룹 내부에서는
+       * In Progress → Confirmed → 기타 순서입니다.
+       */
       const statusOrder =
         getGroupedUpdateStatusOrder(
           a.status
