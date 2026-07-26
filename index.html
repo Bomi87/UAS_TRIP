@@ -2467,7 +2467,7 @@ function getLegUpdates(trip, leg) {
           baseServiceName
         );
 
-      const displayServiceName =
+      let displayServiceName =
         isPermissionService &&
         serviceReference
           ? baseServiceName +
@@ -2475,6 +2475,24 @@ function getLegUpdates(trip, leg) {
             serviceReference +
             ')'
           : baseServiceName;
+
+      const entryPoint =
+        String(record.entryPoint || '').trim();
+
+      const exitPoint =
+        String(record.exitPoint || '').trim();
+
+      if (
+        String(record.serviceType || '').toUpperCase() === 'OVF' &&
+        (entryPoint || exitPoint)
+      ) {
+        displayServiceName +=
+          ' [' +
+          (entryPoint || '—') +
+          ' → ' +
+          (exitPoint || '—') +
+          ']';
+      }
 
       return {
         id: [
@@ -2507,7 +2525,11 @@ function getLegUpdates(trip, leg) {
           record.rawServiceName ||
           record.rawClearanceService ||
           '',
-        sourceType: record.sourceType || ''
+        sourceType: record.sourceType || '',
+        serviceType: record.serviceType || '',
+        countryCode: record.countryCode || '',
+        entryPoint: record.entryPoint || '',
+        exitPoint: record.exitPoint || ''
       };
     })
     .sort(function (a, b) {
