@@ -2740,6 +2740,26 @@ function groupLegUpdates(updates) {
     const briefNotes =
       String(update.briefNotes || '').trim();
 
+    const serviceDetails =
+      Array.isArray(update.serviceDetails)
+        ? update.serviceDetails
+            .map(function (item) {
+              return {
+                label: String(
+                  item && item.label || ''
+                ).trim(),
+                value: String(
+                  item && item.value || ''
+                ).trim()
+              };
+            })
+            .filter(function (item) {
+              return Boolean(
+                item.label && item.value
+              );
+            })
+        : [];
+
     /*
      * 같은 표시 서비스가 중복될 때도 상세정보가 다르면 별도 아이템으로 유지합니다.
      * 상세정보까지 같으면 중복 표시하지 않습니다.
@@ -2748,6 +2768,7 @@ function groupLegUpdates(updates) {
       serviceName,
       serviceReference,
       briefNotes,
+      JSON.stringify(serviceDetails),
       update.id || '',
       update.serviceKey || '',
       update.sourceOrder || ''
@@ -2766,6 +2787,7 @@ function groupLegUpdates(updates) {
         name: serviceName,
         serviceReference: serviceReference,
         briefNotes: briefNotes,
+        serviceDetails: serviceDetails,
         sourceOrder: Number(update.sourceOrder || 0)
       });
     }
@@ -2826,8 +2848,17 @@ function renderServiceDetailItem(
       service && service.briefNotes || ''
     ).trim();
 
+  const serviceDetails =
+    service && Array.isArray(service.serviceDetails)
+      ? service.serviceDetails
+      : [];
+
   const hasDetails =
-    Boolean(serviceReference || briefNotes);
+    Boolean(
+      serviceReference ||
+      briefNotes ||
+      serviceDetails.length
+    );
 
   const serviceName =
     escapeHtml(
@@ -2850,31 +2881,65 @@ function renderServiceDetailItem(
           '</span>'
         );
 
+  const standardDetails = [];
+
+  if (serviceReference) {
+    standardDetails.push(
+      '<div class="service-detail-field">' +
+        '<div class="service-detail-label">' +
+          'Service Reference' +
+        '</div>' +
+        '<div class="service-detail-value">' +
+          escapeHtml(serviceReference) +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  if (briefNotes) {
+    standardDetails.push(
+      '<div class="service-detail-field">' +
+        '<div class="service-detail-label">' +
+          'Brief Notes' +
+        '</div>' +
+        '<div class="service-detail-value">' +
+          escapeHtml(briefNotes) +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  const dynamicDetails =
+    serviceDetails.map(function (item) {
+      const label =
+        String(item && item.label || '').trim();
+
+      const value =
+        String(item && item.value || '').trim();
+
+      if (!label || !value) {
+        return '';
+      }
+
+      return (
+        '<div class="service-detail-field">' +
+          '<div class="service-detail-label">' +
+            escapeHtml(label) +
+          '</div>' +
+          '<div class="service-detail-value">' +
+            escapeHtml(value) +
+          '</div>' +
+        '</div>'
+      );
+    }).join('');
+
   const detailPanel =
     hasDetails
       ? (
           '<div class="service-detail-panel">' +
             '<div class="service-detail-grid">' +
-              '<div>' +
-                '<div class="service-detail-label">' +
-                  'Service Reference' +
-                '</div>' +
-                '<div class="service-detail-value">' +
-                  escapeHtml(
-                    serviceReference || 'n/a'
-                  ) +
-                '</div>' +
-              '</div>' +
-              '<div>' +
-                '<div class="service-detail-label">' +
-                  'Brief Notes' +
-                '</div>' +
-                '<div class="service-detail-value">' +
-                  escapeHtml(
-                    briefNotes || 'n/a'
-                  ) +
-                '</div>' +
-              '</div>' +
+              standardDetails.join('') +
+              dynamicDetails +
             '</div>' +
           '</div>'
         )
