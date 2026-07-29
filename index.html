@@ -1400,7 +1400,7 @@
   let GTMX_APP_STARTED = false;
 
   const BRIEF_LOCAL_CACHE_KEY =
-    'GTMX_FLIGHT_BRIEF_CACHE_V9';
+    'GTMX_FLIGHT_BRIEF_CACHE_V12';
 
   const BRIEF_LOCAL_CACHE_MAX_AGE_MS =
     35 * 60 * 1000;
@@ -1412,7 +1412,7 @@
  * 브라우저/앱 세션이 종료되면 자동으로 사라집니다.
  */
 const DASHBOARD_SESSION_CACHE_KEY =
-  'GTMX_DASHBOARD_SESSION_CACHE_V4';
+  'GTMX_DASHBOARD_SESSION_CACHE_V5';
 
 const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
   20 * 60 * 1000;
@@ -3080,9 +3080,18 @@ function renderServiceDetailItem(
           dialNumber = '00700' + dialNumber;
         }
 
-        return '<a href="tel:' +
-          escapeAttribute(dialNumber) +
-          '">' + escapeHtml(text) + '</a>';
+        const displayNumber =
+          '00700 ' + text;
+
+        return (
+          '<a href="tel:' +
+            escapeAttribute(dialNumber) +
+            '" onclick="window.location.href=\'tel:' +
+            escapeAttribute(dialNumber) +
+            '\'; return false;">' +
+            escapeHtml(displayNumber) +
+          '</a>'
+        );
       }
 
       if (type === 'email') {
