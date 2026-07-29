@@ -572,6 +572,75 @@
   line-height: 1.55;
 }
 
+
+.leg-update-group-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ovf-detail-button {
+  flex: 0 0 auto;
+  min-height: 27px;
+  padding: 0 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ovf-detail-button:hover,
+.ovf-detail-button.open {
+  border-color: #60a5fa;
+  background: #dbeafe;
+}
+
+.ovf-service-details {
+  display: none;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.ovf-service-details.open {
+  display: block;
+}
+
+.ovf-service-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(240px, 1.3fr);
+  gap: 16px;
+}
+
+.ovf-service-detail-label {
+  margin-bottom: 4px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.ovf-service-detail-value {
+  color: #0f172a;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 620px) {
+  .ovf-service-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .pob-summary-row {
   display: flex;
   justify-content: flex-end;
@@ -2454,27 +2523,17 @@ function getLegUpdates(trip, leg) {
           record.serviceReference || ''
         ).trim();
 
-      /*
-       * 허가 관련 서비스는 GTMx Service Reference가 있을 때
-       * 서비스명 뒤에 괄호로 번호를 표시합니다.
-       * TSA Waiver는 대상에서 제외합니다.
-       */
-      const isPermissionService =
-        /(?:\bPPR\b|Permit|Permission|Landing Rights)/i.test(
-          baseServiceName
-        ) &&
-        !/TSA\s*Waiver/i.test(
-          baseServiceName
-        );
+      const briefNotes =
+        String(
+          record.briefNotes || ''
+        ).trim();
 
+      /*
+       * Service Reference는 서비스명에 붙이지 않고
+       * Overflight 국가 행의 Detail 패널에서만 표시합니다.
+       */
       let displayServiceName =
-        isPermissionService &&
-        serviceReference
-          ? baseServiceName +
-            ' (' +
-            serviceReference +
-            ')'
-          : baseServiceName;
+        baseServiceName;
 
       const entryPoint =
         String(record.entryPoint || '').trim();
@@ -2529,7 +2588,9 @@ function getLegUpdates(trip, leg) {
         serviceType: record.serviceType || '',
         countryCode: record.countryCode || '',
         entryPoint: record.entryPoint || '',
-        exitPoint: record.exitPoint || ''
+        exitPoint: record.exitPoint || '',
+        serviceReference: serviceReference,
+        briefNotes: briefNotes
       };
     })
     .sort(function (a, b) {
@@ -2641,7 +2702,8 @@ function groupLegUpdates(updates) {
         location: location,
         status: status,
         services: [],
-        isOverflight: isOverflight
+        isOverflight: isOverflight,
+        serviceDetails: []
       };
     } else if (isOverflight) {
       grouped[key].isOverflight = true;
@@ -2656,6 +2718,34 @@ function groupLegUpdates(updates) {
       grouped[key].services.push(
         serviceName
       );
+    }
+
+    if (isOverflight) {
+      const serviceReference =
+        String(update.serviceReference || '').trim();
+
+      const briefNotes =
+        String(update.briefNotes || '').trim();
+
+      if (serviceReference || briefNotes) {
+        const detailKey =
+          serviceReference + '|' + briefNotes;
+
+        const alreadyAdded =
+          grouped[key].serviceDetails.some(
+            function (detail) {
+              return detail.key === detailKey;
+            }
+          );
+
+        if (!alreadyAdded) {
+          grouped[key].serviceDetails.push({
+            key: detailKey,
+            serviceReference: serviceReference,
+            briefNotes: briefNotes
+          });
+        }
+      }
     }
   });
 
@@ -2713,23 +2803,92 @@ function renderLegUpdates(updates) {
 
   return (
     '<div class="leg-update-list">' +
-      groups.map(function (group) {
+      groups.map(function (group, groupIndex) {
+        const details =
+          Array.isArray(group.serviceDetails)
+            ? group.serviceDetails
+            : [];
+
+        const hasDetails =
+          group.isOverflight &&
+          details.length > 0;
+
+        const detailId =
+          'ovfServiceDetails-' +
+          String(groupIndex) + '-' +
+          String(
+            group.location || ''
+          ).replace(/[^a-z0-9]+/gi, '-');
+
+        const detailButton =
+          hasDetails
+            ? (
+                '<button type="button" ' +
+                  'class="ovf-detail-button" ' +
+                  'id="' + escapeHtml(detailId + '-button') + '" ' +
+                  'aria-expanded="false" ' +
+                  'onclick="toggleOvfServiceDetails(\'' +
+                    escapeHtml(detailId) +
+                  '\')">' +
+                  'Detail' +
+                '</button>'
+              )
+            : '';
+
+        const detailPanel =
+          hasDetails
+            ? (
+                '<div class="ovf-service-details" ' +
+                  'id="' + escapeHtml(detailId) + '">' +
+                  details.map(function (detail) {
+                    return (
+                      '<div class="ovf-service-detail-grid">' +
+                        '<div>' +
+                          '<div class="ovf-service-detail-label">' +
+                            'Service Reference' +
+                          '</div>' +
+                          '<div class="ovf-service-detail-value">' +
+                            escapeHtml(
+                              detail.serviceReference || 'n/a'
+                            ) +
+                          '</div>' +
+                        '</div>' +
+                        '<div>' +
+                          '<div class="ovf-service-detail-label">' +
+                            'Brief Notes' +
+                          '</div>' +
+                          '<div class="ovf-service-detail-value">' +
+                            escapeHtml(
+                              detail.briefNotes || 'n/a'
+                            ) +
+                          '</div>' +
+                        '</div>' +
+                      '</div>'
+                    );
+                  }).join('') +
+                '</div>'
+              )
+            : '';
+
         return (
           '<div class="leg-update-group">' +
 
-            '<div class="leg-update-group-head' +
-              getGroupedUpdateStatusClass(
-                group.status
-              ) +
-            '">' +
-              escapeHtml(
-                group.location || ''
-              ) +
-              ' (' +
-              escapeHtml(
-                group.status || ''
-              ) +
-              ')' +
+            '<div class="leg-update-group-head-row">' +
+              '<div class="leg-update-group-head' +
+                getGroupedUpdateStatusClass(
+                  group.status
+                ) +
+              '">' +
+                escapeHtml(
+                  group.location || ''
+                ) +
+                ' (' +
+                escapeHtml(
+                  group.status || ''
+                ) +
+                ')' +
+              '</div>' +
+              detailButton +
             '</div>' +
 
             '<div class="leg-update-group-services">' +
@@ -2738,10 +2897,37 @@ function renderLegUpdates(updates) {
               ) +
             '</div>' +
 
+            detailPanel +
+
           '</div>'
         );
       }).join('') +
     '</div>'
+  );
+}
+
+
+function toggleOvfServiceDetails(detailId) {
+  const panel =
+    document.getElementById(detailId);
+
+  const button =
+    document.getElementById(
+      detailId + '-button'
+    );
+
+  if (!panel || !button) {
+    return;
+  }
+
+  const willOpen =
+    !panel.classList.contains('open');
+
+  panel.classList.toggle('open', willOpen);
+  button.classList.toggle('open', willOpen);
+  button.setAttribute(
+    'aria-expanded',
+    willOpen ? 'true' : 'false'
   );
 }
 
