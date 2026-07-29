@@ -696,31 +696,6 @@
   text-underline-offset: 2px;
 }
 
-.service-phone-display {
-  color: #334155;
-}
-
-.service-phone-call {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 5px;
-  padding: 2px 7px;
-  border: 1px solid #bfdbfe;
-  border-radius: 7px;
-  color: #1d4ed8 !important;
-  background: #eef4ff;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1.45;
-  text-decoration: none !important;
-  white-space: nowrap;
-}
-
-.service-phone-call:hover {
-  background: #dbeafe;
-}
-
 @media (max-width: 620px) {
   .service-vendor-grid {
     grid-template-columns: 1fr;
@@ -1425,7 +1400,7 @@
   let GTMX_APP_STARTED = false;
 
   const BRIEF_LOCAL_CACHE_KEY =
-    'GTMX_FLIGHT_BRIEF_CACHE_V14';
+    'GTMX_FLIGHT_BRIEF_CACHE_V13';
 
   const BRIEF_LOCAL_CACHE_MAX_AGE_MS =
     35 * 60 * 1000;
@@ -1437,7 +1412,7 @@
  * 브라우저/앱 세션이 종료되면 자동으로 사라집니다.
  */
 const DASHBOARD_SESSION_CACHE_KEY =
-  'GTMX_DASHBOARD_SESSION_CACHE_V7';
+  'GTMX_DASHBOARD_SESSION_CACHE_V6';
 
 const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
   20 * 60 * 1000;
@@ -3150,12 +3125,11 @@ function renderServiceDetailItem(
         }
 
         return (
-          '<span class="service-phone-display">' +
-            escapeHtml(text) +
-          '</span> ' +
-          '<a class="service-phone-call" href="tel:' +
+          '<a href="tel:' +
             escapeAttribute(dialNumber) +
-            '">📞 Call</a>'
+            '">' +
+            escapeHtml(text) +
+          '</a>'
         );
       }
 
