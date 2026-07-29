@@ -3061,8 +3061,27 @@ function renderServiceDetailItem(
       }
 
       if (type === 'tel') {
+        /*
+         * 한국 국제전화 식별번호 00700을 자동으로 붙입니다.
+         * 화면에는 GTMx 원본 전화번호를 그대로 표시하고,
+         * 실제 통화 링크만 00700 + 국가번호 형식으로 변환합니다.
+         */
+        let dialNumber = text
+          .replace(/[^0-9+]/g, '')
+          .trim();
+
+        if (/^00700/.test(dialNumber)) {
+          // 이미 00700이 포함된 번호는 그대로 사용합니다.
+        } else {
+          dialNumber = dialNumber
+            .replace(/^\+/, '')
+            .replace(/^00/, '');
+
+          dialNumber = '00700' + dialNumber;
+        }
+
         return '<a href="tel:' +
-          escapeAttribute(text.replace(/\s+/g, '')) +
+          escapeAttribute(dialNumber) +
           '">' + escapeHtml(text) + '</a>';
       }
 
