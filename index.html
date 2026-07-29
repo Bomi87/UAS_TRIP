@@ -2810,21 +2810,6 @@ function groupLegUpdates(updates) {
 }
 
 
-function buildServiceDetailId(
-  groupIndex,
-  serviceIndex,
-  location
-) {
-  return (
-    'serviceDetail-' +
-    String(groupIndex) + '-' +
-    String(serviceIndex) + '-' +
-    String(location || '')
-      .replace(/[^a-z0-9]+/gi, '-')
-  );
-}
-
-
 function renderServiceDetailItem(
   service,
   group,
@@ -2844,13 +2829,6 @@ function renderServiceDetailItem(
   const hasDetails =
     Boolean(serviceReference || briefNotes);
 
-  const detailId =
-    buildServiceDetailId(
-      groupIndex,
-      serviceIndex,
-      group.location
-    );
-
   const serviceName =
     escapeHtml(
       service && service.name || ''
@@ -2861,12 +2839,8 @@ function renderServiceDetailItem(
       ? (
           '<button type="button" ' +
             'class="service-detail-link" ' +
-            'id="' + escapeHtml(detailId + '-button') + '" ' +
             'aria-expanded="false" ' +
-            'aria-controls="' + escapeHtml(detailId) + '" ' +
-            'onclick="toggleServiceDetails(\'' +
-              escapeHtml(detailId) +
-            '\')">' +
+            'onclick="toggleServiceDetails(this)">' +
             serviceName +
           '</button>'
         )
@@ -2879,8 +2853,7 @@ function renderServiceDetailItem(
   const detailPanel =
     hasDetails
       ? (
-          '<div class="service-detail-panel" ' +
-            'id="' + escapeHtml(detailId) + '">' +
+          '<div class="service-detail-panel">' +
             '<div class="service-detail-grid">' +
               '<div>' +
                 '<div class="service-detail-label">' +
@@ -2972,16 +2945,22 @@ function renderLegUpdates(updates) {
 }
 
 
-function toggleServiceDetails(detailId) {
-  const panel =
-    document.getElementById(detailId);
+function toggleServiceDetails(button) {
+  if (!button) {
+    return;
+  }
 
-  const button =
-    document.getElementById(
-      detailId + '-button'
-    );
+  /*
+   * ID로 요소를 찾지 않고, 클릭한 서비스 버튼 바로 다음에 있는
+   * 상세 패널을 사용합니다. 같은 공항·상태 그룹이 여러 LEG에 반복돼도
+   * 각 서비스가 자기 패널만 정확히 열고 닫습니다.
+   */
+  const panel = button.nextElementSibling;
 
-  if (!panel || !button) {
+  if (
+    !panel ||
+    !panel.classList.contains('service-detail-panel')
+  ) {
     return;
   }
 
