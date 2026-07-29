@@ -580,45 +580,67 @@
   gap: 10px;
 }
 
-.ovf-detail-button {
-  flex: 0 0 auto;
-  min-height: 27px;
-  padding: 0 10px;
-  border: 1px solid #bfdbfe;
-  border-radius: 999px;
-  color: #1d4ed8;
-  background: #eff6ff;
-  font-size: 11px;
-  font-weight: 900;
+/*
+ * 모든 서비스명(PPR, Transportation, Handling, OVF 등)을
+ * 동일한 링크형 버튼으로 표시합니다.
+ */
+.service-detail-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  color: #2563eb;
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  line-height: 1.55;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
   cursor: pointer;
 }
 
-.ovf-detail-button:hover,
-.ovf-detail-button.open {
-  border-color: #60a5fa;
-  background: #dbeafe;
+.service-detail-link:hover,
+.service-detail-link.open {
+  color: #1d4ed8;
 }
 
-.ovf-service-details {
+.service-detail-link:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.service-detail-text {
+  color: #1e293b;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.leg-update-service-item + .leg-update-service-item {
+  margin-top: 5px;
+}
+
+.service-detail-panel {
   display: none;
-  margin-top: 10px;
+  margin-top: 7px;
   padding: 12px;
   border: 1px solid #dbe3ef;
   border-radius: 10px;
   background: #f8fafc;
 }
 
-.ovf-service-details.open {
+.service-detail-panel.open {
   display: block;
 }
 
-.ovf-service-detail-grid {
+.service-detail-grid {
   display: grid;
   grid-template-columns: minmax(150px, 0.7fr) minmax(240px, 1.3fr);
   gap: 16px;
 }
 
-.ovf-service-detail-label {
+.service-detail-label {
   margin-bottom: 4px;
   color: #475569;
   font-size: 11px;
@@ -627,7 +649,7 @@
   letter-spacing: .04em;
 }
 
-.ovf-service-detail-value {
+.service-detail-value {
   color: #0f172a;
   font-size: 12px;
   line-height: 1.55;
@@ -636,7 +658,7 @@
 }
 
 @media (max-width: 620px) {
-  .ovf-service-detail-grid {
+  .service-detail-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -2529,8 +2551,8 @@ function getLegUpdates(trip, leg) {
         ).trim();
 
       /*
-       * Service Reference는 서비스명에 붙이지 않고
-       * Overflight 국가 행의 Detail 패널에서만 표시합니다.
+       * Service Reference는 서비스명에 직접 붙이지 않고
+       * 각 서비스명을 클릭했을 때 펼쳐지는 상세 패널에서 표시합니다.
        */
       let displayServiceName =
         baseServiceName;
@@ -2702,62 +2724,65 @@ function groupLegUpdates(updates) {
         location: location,
         status: status,
         services: [],
-        isOverflight: isOverflight,
-        serviceDetails: []
+        isOverflight: isOverflight
       };
     } else if (isOverflight) {
       grouped[key].isOverflight = true;
     }
 
-    if (
-      serviceName &&
-      grouped[key].services.indexOf(
-        serviceName
-      ) === -1
-    ) {
-      grouped[key].services.push(
-        serviceName
-      );
+    if (!serviceName) {
+      return;
     }
 
-    if (isOverflight) {
-      const serviceReference =
-        String(update.serviceReference || '').trim();
+    const serviceReference =
+      String(update.serviceReference || '').trim();
 
-      const briefNotes =
-        String(update.briefNotes || '').trim();
+    const briefNotes =
+      String(update.briefNotes || '').trim();
 
-      if (serviceReference || briefNotes) {
-        const detailKey =
-          serviceReference + '|' + briefNotes;
+    /*
+     * 같은 표시 서비스가 중복될 때도 상세정보가 다르면 별도 아이템으로 유지합니다.
+     * 상세정보까지 같으면 중복 표시하지 않습니다.
+     */
+    const serviceIdentity = [
+      serviceName,
+      serviceReference,
+      briefNotes,
+      update.id || '',
+      update.serviceKey || '',
+      update.sourceOrder || ''
+    ].join('|');
 
-        const alreadyAdded =
-          grouped[key].serviceDetails.some(
-            function (detail) {
-              return detail.key === detailKey;
-            }
-          );
-
-        if (!alreadyAdded) {
-          grouped[key].serviceDetails.push({
-            key: detailKey,
-            serviceReference: serviceReference,
-            briefNotes: briefNotes
-          });
+    const exactDuplicate =
+      grouped[key].services.some(
+        function (service) {
+          return service.identity === serviceIdentity;
         }
-      }
+      );
+
+    if (!exactDuplicate) {
+      grouped[key].services.push({
+        identity: serviceIdentity,
+        name: serviceName,
+        serviceReference: serviceReference,
+        briefNotes: briefNotes,
+        sourceOrder: Number(update.sourceOrder || 0)
+      });
     }
   });
 
   return Object.keys(grouped)
     .map(function (key) {
+      grouped[key].services.sort(
+        function (a, b) {
+          return a.sourceOrder - b.sourceOrder;
+        }
+      );
+
       return grouped[key];
     })
     .sort(function (a, b) {
-      /*
-       * Overflight Permit 그룹을 공항 서비스 그룹보다
-       * 항상 먼저 표시합니다.
-       */
+      /* Overflight Permit 그룹을 공항 서비스 그룹보다 먼저 표시합니다. */
       const groupOrder =
         (a.isOverflight ? 0 : 1) -
         (b.isOverflight ? 0 : 1);
@@ -2766,10 +2791,6 @@ function groupLegUpdates(updates) {
         return groupOrder;
       }
 
-      /*
-       * 각 그룹 내부에서는
-       * In Progress → Confirmed → 기타 순서입니다.
-       */
       const statusOrder =
         getGroupedUpdateStatusOrder(
           a.status
@@ -2789,6 +2810,112 @@ function groupLegUpdates(updates) {
 }
 
 
+function buildServiceDetailId(
+  groupIndex,
+  serviceIndex,
+  location
+) {
+  return (
+    'serviceDetail-' +
+    String(groupIndex) + '-' +
+    String(serviceIndex) + '-' +
+    String(location || '')
+      .replace(/[^a-z0-9]+/gi, '-')
+  );
+}
+
+
+function renderServiceDetailItem(
+  service,
+  group,
+  groupIndex,
+  serviceIndex
+) {
+  const serviceReference =
+    String(
+      service && service.serviceReference || ''
+    ).trim();
+
+  const briefNotes =
+    String(
+      service && service.briefNotes || ''
+    ).trim();
+
+  const hasDetails =
+    Boolean(serviceReference || briefNotes);
+
+  const detailId =
+    buildServiceDetailId(
+      groupIndex,
+      serviceIndex,
+      group.location
+    );
+
+  const serviceName =
+    escapeHtml(
+      service && service.name || ''
+    );
+
+  const nameElement =
+    hasDetails
+      ? (
+          '<button type="button" ' +
+            'class="service-detail-link" ' +
+            'id="' + escapeHtml(detailId + '-button') + '" ' +
+            'aria-expanded="false" ' +
+            'aria-controls="' + escapeHtml(detailId) + '" ' +
+            'onclick="toggleServiceDetails(\'' +
+              escapeHtml(detailId) +
+            '\')">' +
+            serviceName +
+          '</button>'
+        )
+      : (
+          '<span class="service-detail-text">' +
+            serviceName +
+          '</span>'
+        );
+
+  const detailPanel =
+    hasDetails
+      ? (
+          '<div class="service-detail-panel" ' +
+            'id="' + escapeHtml(detailId) + '">' +
+            '<div class="service-detail-grid">' +
+              '<div>' +
+                '<div class="service-detail-label">' +
+                  'Service Reference' +
+                '</div>' +
+                '<div class="service-detail-value">' +
+                  escapeHtml(
+                    serviceReference || 'n/a'
+                  ) +
+                '</div>' +
+              '</div>' +
+              '<div>' +
+                '<div class="service-detail-label">' +
+                  'Brief Notes' +
+                '</div>' +
+                '<div class="service-detail-value">' +
+                  escapeHtml(
+                    briefNotes || 'n/a'
+                  ) +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>'
+        )
+      : '';
+
+  return (
+    '<div class="leg-update-service-item">' +
+      nameElement +
+      detailPanel +
+    '</div>'
+  );
+}
+
+
 function renderLegUpdates(updates) {
   if (!updates.length) {
     return (
@@ -2804,72 +2931,6 @@ function renderLegUpdates(updates) {
   return (
     '<div class="leg-update-list">' +
       groups.map(function (group, groupIndex) {
-        const details =
-          Array.isArray(group.serviceDetails)
-            ? group.serviceDetails
-            : [];
-
-        const hasDetails =
-          group.isOverflight &&
-          details.length > 0;
-
-        const detailId =
-          'ovfServiceDetails-' +
-          String(groupIndex) + '-' +
-          String(
-            group.location || ''
-          ).replace(/[^a-z0-9]+/gi, '-');
-
-        const detailButton =
-          hasDetails
-            ? (
-                '<button type="button" ' +
-                  'class="ovf-detail-button" ' +
-                  'id="' + escapeHtml(detailId + '-button') + '" ' +
-                  'aria-expanded="false" ' +
-                  'onclick="toggleOvfServiceDetails(\'' +
-                    escapeHtml(detailId) +
-                  '\')">' +
-                  'Detail' +
-                '</button>'
-              )
-            : '';
-
-        const detailPanel =
-          hasDetails
-            ? (
-                '<div class="ovf-service-details" ' +
-                  'id="' + escapeHtml(detailId) + '">' +
-                  details.map(function (detail) {
-                    return (
-                      '<div class="ovf-service-detail-grid">' +
-                        '<div>' +
-                          '<div class="ovf-service-detail-label">' +
-                            'Service Reference' +
-                          '</div>' +
-                          '<div class="ovf-service-detail-value">' +
-                            escapeHtml(
-                              detail.serviceReference || 'n/a'
-                            ) +
-                          '</div>' +
-                        '</div>' +
-                        '<div>' +
-                          '<div class="ovf-service-detail-label">' +
-                            'Brief Notes' +
-                          '</div>' +
-                          '<div class="ovf-service-detail-value">' +
-                            escapeHtml(
-                              detail.briefNotes || 'n/a'
-                            ) +
-                          '</div>' +
-                        '</div>' +
-                      '</div>'
-                    );
-                  }).join('') +
-                '</div>'
-              )
-            : '';
-
         return (
           '<div class="leg-update-group">' +
 
@@ -2888,16 +2949,20 @@ function renderLegUpdates(updates) {
                 ) +
                 ')' +
               '</div>' +
-              detailButton +
             '</div>' +
 
             '<div class="leg-update-group-services">' +
-              escapeHtml(
-                group.services.join(' / ')
-              ) +
+              group.services.map(
+                function (service, serviceIndex) {
+                  return renderServiceDetailItem(
+                    service,
+                    group,
+                    groupIndex,
+                    serviceIndex
+                  );
+                }
+              ).join('') +
             '</div>' +
-
-            detailPanel +
 
           '</div>'
         );
@@ -2907,7 +2972,7 @@ function renderLegUpdates(updates) {
 }
 
 
-function toggleOvfServiceDetails(detailId) {
+function toggleServiceDetails(detailId) {
   const panel =
     document.getElementById(detailId);
 
