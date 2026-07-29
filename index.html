@@ -1400,7 +1400,7 @@
   let GTMX_APP_STARTED = false;
 
   const BRIEF_LOCAL_CACHE_KEY =
-    'GTMX_FLIGHT_BRIEF_CACHE_V13';
+    'GTMX_FLIGHT_BRIEF_CACHE_V15';
 
   const BRIEF_LOCAL_CACHE_MAX_AGE_MS =
     35 * 60 * 1000;
@@ -1412,7 +1412,7 @@
  * 브라우저/앱 세션이 종료되면 자동으로 사라집니다.
  */
 const DASHBOARD_SESSION_CACHE_KEY =
-  'GTMX_DASHBOARD_SESSION_CACHE_V6';
+  'GTMX_DASHBOARD_SESSION_CACHE_V8';
 
 const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
   20 * 60 * 1000;
@@ -3357,6 +3357,28 @@ function toggleLegUpdates(
     'aria-expanded',
     willOpen ? 'true' : 'false'
   );
+
+  /*
+   * 최상위 Leg를 닫을 때 해당 Leg 내부에 열려 있던
+   * 모든 서비스 상세정보도 함께 닫고 초기화합니다.
+   */
+  if (!willOpen) {
+    panel
+      .querySelectorAll('.service-detail-panel.open')
+      .forEach(function (detailPanel) {
+        detailPanel.classList.remove('open');
+      });
+
+    panel
+      .querySelectorAll('.service-detail-link.open')
+      .forEach(function (detailButton) {
+        detailButton.classList.remove('open');
+        detailButton.setAttribute(
+          'aria-expanded',
+          'false'
+        );
+      });
+  }
 }
 
 
