@@ -657,6 +657,51 @@
   overflow-wrap: anywhere;
 }
 
+
+.service-vendor-section {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #dbe3ef;
+}
+
+.service-vendor-card + .service-vendor-card {
+  margin-top: 12px;
+}
+
+.service-vendor-name {
+  margin-bottom: 10px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
+.service-vendor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+}
+
+.service-vendor-value {
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.service-vendor-value a {
+  color: #7c3aed;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 620px) {
+  .service-vendor-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 620px) {
   .service-detail-grid {
     grid-template-columns: 1fr;
@@ -1355,7 +1400,7 @@
   let GTMX_APP_STARTED = false;
 
   const BRIEF_LOCAL_CACHE_KEY =
-    'GTMX_FLIGHT_BRIEF_CACHE_V7';
+    'GTMX_FLIGHT_BRIEF_CACHE_V9';
 
   const BRIEF_LOCAL_CACHE_MAX_AGE_MS =
     35 * 60 * 1000;
@@ -1367,7 +1412,7 @@
  * 브라우저/앱 세션이 종료되면 자동으로 사라집니다.
  */
 const DASHBOARD_SESSION_CACHE_KEY =
-  'GTMX_DASHBOARD_SESSION_CACHE_V2';
+  'GTMX_DASHBOARD_SESSION_CACHE_V4';
 
 const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
   20 * 60 * 1000;
@@ -2555,6 +2600,11 @@ function getLegUpdates(trip, leg) {
           record.serviceDetails
         );
 
+      const handlingVendors =
+        normalizeHandlingVendors(
+          record.handlingVendors
+        );
+
       /*
        * Service Reference는 서비스명에 직접 붙이지 않고
        * 각 서비스명을 클릭했을 때 펼쳐지는 상세 패널에서 표시합니다.
@@ -2618,7 +2668,8 @@ function getLegUpdates(trip, leg) {
         exitPoint: record.exitPoint || '',
         serviceReference: serviceReference,
         briefNotes: briefNotes,
-        serviceDetails: serviceDetails
+        serviceDetails: serviceDetails,
+        handlingVendors: handlingVendors
       };
     })
     .sort(function (a, b) {
@@ -2716,6 +2767,43 @@ function normalizeServiceDetails(details) {
 }
 
 
+function normalizeHandlingVendors(vendors) {
+  if (!Array.isArray(vendors)) {
+    return [];
+  }
+
+  function normalizeList(value) {
+    const values = Array.isArray(value)
+      ? value
+      : (value == null || value === '' ? [] : [value]);
+
+    return values
+      .map(function (item) {
+        return String(item == null ? '' : item).trim();
+      })
+      .filter(Boolean);
+  }
+
+  return vendors
+    .map(function (vendor) {
+      return {
+        vendor: String(vendor && vendor.vendor || '').trim(),
+        fullName: String(vendor && vendor.fullName || '').trim(),
+        phone: normalizeList(vendor && vendor.phone),
+        mobile: normalizeList(vendor && vendor.mobile),
+        email: normalizeList(vendor && vendor.email)
+      };
+    })
+    .filter(function (vendor) {
+      return Boolean(
+        vendor.vendor || vendor.fullName ||
+        vendor.phone.length || vendor.mobile.length ||
+        vendor.email.length
+      );
+    });
+}
+
+
 function groupLegUpdates(updates) {
   const grouped = {};
 
@@ -2788,6 +2876,11 @@ function groupLegUpdates(updates) {
         update.serviceDetails
       );
 
+    const handlingVendors =
+      normalizeHandlingVendors(
+        update.handlingVendors
+      );
+
     /*
      * 같은 표시 서비스가 중복될 때도 상세정보가 다르면 별도 아이템으로 유지합니다.
      * 상세정보까지 같으면 중복 표시하지 않습니다.
@@ -2797,6 +2890,7 @@ function groupLegUpdates(updates) {
       serviceReference,
       briefNotes,
       JSON.stringify(serviceDetails),
+      JSON.stringify(handlingVendors),
       update.id || '',
       update.serviceKey || '',
       update.sourceOrder || ''
@@ -2816,6 +2910,7 @@ function groupLegUpdates(updates) {
         serviceReference: serviceReference,
         briefNotes: briefNotes,
         serviceDetails: serviceDetails,
+        handlingVendors: handlingVendors,
         sourceOrder: Number(update.sourceOrder || 0)
       });
     }
@@ -2881,11 +2976,25 @@ function renderServiceDetailItem(
       service && service.serviceDetails
     );
 
+  const handlingVendors =
+    normalizeHandlingVendors(
+      service && service.handlingVendors
+    );
+
+  const isHandlingService =
+    /(?:^|\s)Handling(?:$|\s)/i.test(
+      String(service && service.name || '')
+    );
+
+  const visibleHandlingVendors =
+    isHandlingService ? handlingVendors : [];
+
   const hasDetails =
     Boolean(
       serviceReference ||
       briefNotes ||
-      serviceDetails.length
+      serviceDetails.length ||
+      visibleHandlingVendors.length
     );
 
   const serviceName =
@@ -2937,6 +3046,76 @@ function renderServiceDetailItem(
     );
   }
 
+
+  function renderContactValues(values, type) {
+    const list = Array.isArray(values) ? values : [];
+
+    if (!list.length) {
+      return 'n/a';
+    }
+
+    return list.map(function (value) {
+      const text = String(value || '').trim();
+      if (!text) {
+        return '';
+      }
+
+      if (type === 'tel') {
+        return '<a href="tel:' +
+          escapeAttribute(text.replace(/\s+/g, '')) +
+          '">' + escapeHtml(text) + '</a>';
+      }
+
+      if (type === 'email') {
+        return '<a href="mailto:' +
+          escapeAttribute(text) +
+          '">' + escapeHtml(text) + '</a>';
+      }
+
+      return escapeHtml(text);
+    }).filter(Boolean).join(', ');
+  }
+
+  const vendorSection =
+    visibleHandlingVendors.length
+      ? (
+          '<div class="service-vendor-section">' +
+            visibleHandlingVendors.map(function (vendor) {
+              const vendorTitle =
+                vendor.vendor || vendor.fullName || 'Handling Vendor';
+
+              return (
+                '<div class="service-vendor-card">' +
+                  '<div class="service-vendor-name">' +
+                    escapeHtml(vendorTitle) +
+                  '</div>' +
+                  '<div class="service-vendor-grid">' +
+                    '<div>' +
+                      '<div class="service-detail-label">Telephone number</div>' +
+                      '<div class="service-vendor-value">' +
+                        renderContactValues(vendor.phone, 'tel') +
+                      '</div>' +
+                    '</div>' +
+                    '<div>' +
+                      '<div class="service-detail-label">Mobile number</div>' +
+                      '<div class="service-vendor-value">' +
+                        renderContactValues(vendor.mobile, 'tel') +
+                      '</div>' +
+                    '</div>' +
+                    '<div>' +
+                      '<div class="service-detail-label">Email</div>' +
+                      '<div class="service-vendor-value">' +
+                        renderContactValues(vendor.email, 'email') +
+                      '</div>' +
+                    '</div>' +
+                  '</div>' +
+                '</div>'
+              );
+            }).join('') +
+          '</div>'
+        )
+      : '';
+
   const dynamicDetails =
     serviceDetails.map(function (item) {
       const label =
@@ -2965,6 +3144,7 @@ function renderServiceDetailItem(
     hasDetails
       ? (
           '<div class="service-detail-panel">' +
+            vendorSection +
             '<div class="service-detail-grid">' +
               standardDetails.join('') +
               dynamicDetails +
