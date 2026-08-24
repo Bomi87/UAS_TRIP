@@ -309,7 +309,7 @@
   min-height: 30px;
   margin-left: 8px;
   padding: 0 10px;
-  border: 0;
+  border: 1px solid rgba(86, 163, 255, .32);
   border-radius: 8px;
   color: #1d4ed8;
   background: #dbeafe;
@@ -317,7 +317,29 @@
   font-weight: 800;
 }
 
+/* HL8080: WFS와 동일하게 청록색 */
+.route-button.route-aircraft-hl8080 {
+  color: #0f766e;
+  background: #ccfbf1;
+  border-color: #5eead4;
+}
+
+/* HL8372: WFS와 동일하게 파란색 */
+.route-button.route-aircraft-hl8372 {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
 .route-button:hover {
+  filter: brightness(.96);
+}
+
+.route-button.route-aircraft-hl8080:hover {
+  background: #99f6e4;
+}
+
+.route-button.route-aircraft-hl8372:hover {
   background: #bfdbfe;
 }
 
@@ -358,6 +380,25 @@
 .route-modal-title {
   margin: 0;
   font-size: 19px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.route-modal-aircraft {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: #1d4ed8;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .route-modal-close {
@@ -2233,7 +2274,15 @@ const localToDateTime =
             '</strong>' +
 
             '<button ' +
-              'class="route-button" ' +
+              'class="route-button ' +
+                (
+                  String(trip.aircraftRegistration || '').trim().toUpperCase() === 'HL8080'
+                    ? 'route-aircraft-hl8080'
+                    : String(trip.aircraftRegistration || '').trim().toUpperCase() === 'HL8372'
+                      ? 'route-aircraft-hl8372'
+                      : ''
+                ) +
+              '" ' +
               'type="button" ' +
               'onclick="openRouteModal(' +
                 index +
@@ -3556,8 +3605,19 @@ async function openRouteModal(tripIndex) {
 
   resetRouteModalPosition_();
 
-  elements.routeModalTitle.textContent =
-    trip.tripNumber + ' ROUTE';
+  const aircraftRegistration = String(
+    trip.aircraftRegistration || ''
+  ).trim().toUpperCase();
+
+  elements.routeModalTitle.innerHTML =
+    escapeHtml(trip.tripNumber) +
+    (
+      aircraftRegistration
+        ? ' / <span class="route-modal-aircraft">' +
+            escapeHtml(aircraftRegistration) +
+          '</span>'
+        : ''
+    );
 
   elements.routeModal.classList.add(
     'open'
