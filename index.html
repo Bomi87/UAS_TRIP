@@ -2904,7 +2904,12 @@ function groupLegUpdates(updates) {
         location: location,
         status: status,
         services: [],
-        isOverflight: isOverflight
+        isOverflight: isOverflight,
+
+        // GTMx 웹사이트/API 원본에서 이 그룹이 처음 등장한 순서를 보존합니다.
+        // Confirmed 된 Overflight Permit은 이 순서대로 표시하여
+        // 실제 항공기가 통과하는 영공 순서를 유지합니다.
+        sourceOrder: Number(update.sourceOrder || 0)
       };
     } else if (isOverflight) {
       grouped[key].isOverflight = true;
@@ -2995,6 +3000,22 @@ function groupLegUpdates(updates) {
 
       if (statusOrder !== 0) {
         return statusOrder;
+      }
+
+      /*
+       * Overflight Permit:
+       * - In Progress 등 미확정 항목은 계속 최상단
+       * - Confirmed 항목끼리는 GTMx 웹사이트/API 원본 순서(sourceOrder) 유지
+       *   → 실제 영공 통과 순서를 그대로 보여줍니다.
+       */
+      if (a.isOverflight && b.isOverflight) {
+        const sourceOrderDiff =
+          Number(a.sourceOrder || 0) -
+          Number(b.sourceOrder || 0);
+
+        if (sourceOrderDiff !== 0) {
+          return sourceOrderDiff;
+        }
       }
 
       return a.location.localeCompare(
