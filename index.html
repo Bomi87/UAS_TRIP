@@ -1270,6 +1270,41 @@
   }
 }
 
+
+
+/* ===== WFS와 동일한 항공기 등록번호 버튼 구분 ===== */
+/* HL8080: 흰색 버튼 + 진한 글자 */
+.route-button.route-aircraft-hl8080 {
+  background: rgba(255, 255, 255, .96) !important;
+  color: #101820 !important;
+  border: 1px solid rgba(255, 255, 255, .98) !important;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.30),
+    0 3px 10px rgba(0,0,0,.14) !important;
+}
+
+.route-button.route-aircraft-hl8080:hover {
+  background: #ffffff !important;
+  color: #08111d !important;
+  filter: brightness(1.03) !important;
+}
+
+/* HL8372: 진한 회색 버튼 + 흰색 글자 */
+.route-button.route-aircraft-hl8372 {
+  background: rgba(112, 126, 141, .34) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(176, 188, 199, .46) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.07),
+    0 3px 10px rgba(0,0,0,.12) !important;
+}
+
+.route-button.route-aircraft-hl8372:hover {
+  background: rgba(132, 147, 162, .44) !important;
+  color: #ffffff !important;
+  filter: brightness(1.06) !important;
+}
+
 </style>
 </head>
 
@@ -1316,7 +1351,7 @@
         </div>
 
         <p class="card-subtitle">
-          *Route: 스케줄 및 Status 확인
+          *A/C 버튼: 스케줄 및 Status 확인
         </p>
 
         <div class="table-wrap">
@@ -1324,7 +1359,6 @@
             <thead>
               <tr>
                 <th>Trip Number</th>
-                <th>A/C</th>
                 <th>Status</th>
                 <th>From</th>
                 <th>To</th>
@@ -1333,7 +1367,7 @@
             </thead>
             <tbody id="tripTableBody">
               <tr>
-                <td colspan="6" class="empty">조회 전입니다.</td>
+                <td colspan="5" class="empty">조회 전입니다.</td>
               </tr>
             </tbody>
           </table>
@@ -2214,7 +2248,7 @@ async function loadBriefServices(
    function renderTrips(trips) {
   if (!trips.length) {
     elements.tripTableBody.innerHTML =
-      '<tr><td colspan="6" class="empty">' +
+      '<tr><td colspan="5" class="empty">' +
       '현재 Active Trip이 없습니다.' +
       '</td></tr>';
 
@@ -2287,7 +2321,7 @@ const localToDateTime =
               'onclick="openRouteModal(' +
                 index +
               ')">' +
-              'ROUTE' +
+              escapeHtml(trip.aircraftRegistration || 'A/C') +
             '</button>' +
           '</td>' +
 
