@@ -1574,7 +1574,7 @@
         </div>
 
         <p class="card-subtitle">
-          *A/C 버튼: 스케줄 및 Status 확인
+          'HLxxxx' 버튼을 누르면 상세 준비상태를 확인할 수 있습니다.
         </p>
 
         <div class="table-wrap">
@@ -1582,7 +1582,7 @@
             <thead>
               <tr>
                 <th>Trip Number</th>
-                <th>Status</th>
+                <th>Briefing</th>
                 <th>From</th>
                 <th>To</th>
                 <th>Legs</th>
@@ -2602,9 +2602,7 @@ const localToDateTime =
               'onclick="openTripDocument(' +
                 index +
               ')">' +
-              escapeHtml(
-                trip.status || ''
-              ) +
+              'FILE' +
             '</button>' +
           '</td>' +
 
