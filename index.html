@@ -856,6 +856,31 @@
   font-weight: 800;
 }
 
+/* ===== Manifest RAW 검증 표시 ===== */
+/* RAW 명단에 사람이 존재하지만 해당 필드 값이 다름 */
+.pob-raw-mismatch {
+  color: #b91c1c !important;
+  background: #fef2f2 !important;
+  font-weight: 900 !important;
+}
+
+/* RAW CREW/PAX 명단에서 사람 자체를 찾지 못함 */
+.pob-raw-not-found td {
+  color: #94a3b8 !important;
+  background: #f1f5f9 !important;
+}
+
+/* RAW에 없는 사람의 PIC 표시는 과하게 튀지 않도록 회색 처리 */
+.pob-raw-not-found .pob-role {
+  color: #64748b !important;
+  background: #e2e8f0 !important;
+}
+
+/* 불일치 셀은 hover 시 RAW 기준값을 title로 확인 가능 */
+.pob-raw-mismatch {
+  cursor: help;
+}
+
 @media (max-width: 620px) {
   .route-row {
     grid-template-columns: 32px minmax(0, 1fr);
@@ -2752,6 +2777,73 @@ function renderPobSummaryButton(
 }
 
 
+function getPobRawFieldClass(
+  person,
+  fieldName,
+  extraClass
+) {
+  const validation =
+    person &&
+    person.rawValidation &&
+    typeof person.rawValidation === 'object'
+      ? person.rawValidation
+      : null;
+
+  const classes = [];
+
+  if (extraClass) {
+    classes.push(extraClass);
+  }
+
+  if (
+    validation &&
+    validation.available === true &&
+    validation.found === true &&
+    validation.fields &&
+    validation.fields[fieldName] &&
+    validation.fields[fieldName].match === false
+  ) {
+    classes.push(
+      'pob-raw-mismatch'
+    );
+  }
+
+  return classes.join(' ');
+}
+
+
+function getPobRawFieldTitle(
+  person,
+  fieldName
+) {
+  const validation =
+    person &&
+    person.rawValidation &&
+    typeof person.rawValidation === 'object'
+      ? person.rawValidation
+      : null;
+
+  if (
+    !validation ||
+    validation.available !== true ||
+    validation.found !== true ||
+    !validation.fields ||
+    !validation.fields[fieldName] ||
+    validation.fields[fieldName].match !== false
+  ) {
+    return '';
+  }
+
+  const rawValue = String(
+    validation.fields[fieldName].rawValue || ''
+  ).trim();
+
+  return rawValue
+    ? 'RAW: ' + rawValue
+    : 'RAW: (blank)';
+}
+
+
 function renderPobRows(people) {
   if (!Array.isArray(people) || !people.length) {
     return (
@@ -2773,9 +2865,102 @@ function renderPobRows(people) {
       person.dateOfBirth || ''
     ).trim();
 
+    const validation =
+      person &&
+      person.rawValidation &&
+      typeof person.rawValidation === 'object'
+        ? person.rawValidation
+        : null;
+
+    const rowClass =
+      validation &&
+      validation.available === true &&
+      validation.found === false
+        ? 'pob-raw-not-found'
+        : '';
+
+    function renderCell(
+      value,
+      fieldName,
+      extraClass
+    ) {
+      const cellClass =
+        getPobRawFieldClass(
+          person,
+          fieldName,
+          extraClass
+        );
+
+      const title =
+        getPobRawFieldTitle(
+          person,
+          fieldName
+        );
+
+      return (
+        '<td' +
+          (
+            cellClass
+              ? ' class="' +
+                  escapeAttribute(cellClass) +
+                '"'
+              : ''
+          ) +
+          (
+            title
+              ? ' title="' +
+                  escapeAttribute(title) +
+                '"'
+              : ''
+          ) +
+        '>' +
+          escapeHtml(
+            String(value || '-')
+          ) +
+        '</td>'
+      );
+    }
+
+    const nameClass =
+      getPobRawFieldClass(
+        person,
+        'name',
+        ''
+      );
+
+    const nameTitle =
+      getPobRawFieldTitle(
+        person,
+        'name'
+      );
+
     return (
-      '<tr>' +
-        '<td>' +
+      '<tr' +
+        (
+          rowClass
+            ? ' class="' +
+                rowClass +
+              '"'
+            : ''
+        ) +
+      '>' +
+
+        '<td' +
+          (
+            nameClass
+              ? ' class="' +
+                  escapeAttribute(nameClass) +
+                '"'
+              : ''
+          ) +
+          (
+            nameTitle
+              ? ' title="' +
+                  escapeAttribute(nameTitle) +
+                '"'
+              : ''
+          ) +
+        '>' +
           escapeHtml(name || '-') +
           (
             /^pic$/i.test(role)
@@ -2785,25 +2970,39 @@ function renderPobRows(people) {
               : ''
           ) +
         '</td>' +
-        '<td>' +
-          escapeHtml(
-            person.passportNumber || '-'
-          ) +
-        '</td>' +
-        '<td class="' +
-          (person.isExpired === true ? 'pob-expired' : '') +
-        '">' +
-          escapeHtml(expiry || '-') +
-        '</td>' +
-        '<td>' +
-          escapeHtml(person.nationality || '-') +
-        '</td>' +
-        '<td>' +
-          escapeHtml(dateOfBirth || '-') +
-        '</td>' +
-        '<td>' +
-          escapeHtml(person.gender || '-') +
-        '</td>' +
+
+        renderCell(
+          person.passportNumber,
+          'passportNumber',
+          ''
+        ) +
+
+        renderCell(
+          expiry,
+          'passportExpiry',
+          person.isExpired === true
+            ? 'pob-expired'
+            : ''
+        ) +
+
+        renderCell(
+          person.nationality,
+          'nationality',
+          ''
+        ) +
+
+        renderCell(
+          dateOfBirth,
+          'dateOfBirth',
+          ''
+        ) +
+
+        renderCell(
+          person.gender,
+          'gender',
+          ''
+        ) +
+
       '</tr>'
     );
   }).join('');
