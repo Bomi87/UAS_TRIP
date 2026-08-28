@@ -1735,7 +1735,7 @@
  * 브라우저/앱 세션이 종료되면 자동으로 사라집니다.
  */
 const DASHBOARD_SESSION_CACHE_KEY =
-  'GTMX_DASHBOARD_SESSION_CACHE_V8';
+  'GTMX_DASHBOARD_SESSION_CACHE_V9';
 
 const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
   20 * 60 * 1000;
@@ -4527,7 +4527,15 @@ function startGtmxAppAfterAuth() {
   const restored =
     restoreDashboardFromSessionCache();
 
-  if (!restored) {
+  /*
+   * 세션 캐시는 화면을 즉시 보여주는 용도로만 사용합니다.
+   * 앱을 열 때마다 dashboard를 한 번 호출하여
+   * 조업상태는 기존 30분 스냅샷을 그대로 받고,
+   * CREW/PAX RAW 검증만 현재 Spreadsheet 기준으로 새로 적용합니다.
+   */
+  if (restored) {
+    refreshDashboard(true);
+  } else {
     refreshDashboard(false);
   }
 
