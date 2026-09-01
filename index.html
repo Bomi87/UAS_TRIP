@@ -856,6 +856,13 @@
   font-weight: 800;
 }
 
+.pob-expiring-soon {
+  color: #0f172a;
+  background: #fde68a;
+  font-weight: 800;
+  cursor: help;
+}
+
 /* ===== Manifest RAW 검증 표시 ===== */
 /* RAW 명단에 사람이 존재하지만 해당 필드 값이 다름 */
 .pob-raw-mismatch {
@@ -2844,7 +2851,75 @@ function getPobRawFieldTitle(
 }
 
 
-function renderPobRows(people) {
+function parseIsoDateOnly(value) {
+  const match = String(value || '').trim().match(
+    /^(\d{4})-(\d{2})-(\d{2})/
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const date = new Date(Date.UTC(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3])
+  ));
+
+  return Number.isNaN(date.getTime())
+    ? null
+    : date;
+}
+
+
+function isPassportExpiringWithinSixMonths(
+  passportExpiry,
+  tripEndDate
+) {
+  const expiryDate = parseIsoDateOnly(passportExpiry);
+  const endDate = parseIsoDateOnly(tripEndDate);
+
+  if (!expiryDate || !endDate || expiryDate < endDate) {
+    return false;
+  }
+
+  const sixMonthsAfterTrip = new Date(endDate.getTime());
+  sixMonthsAfterTrip.setUTCMonth(
+    sixMonthsAfterTrip.getUTCMonth() + 6
+  );
+
+  /* 정확히 6개월이 되는 날은 경고 대상에서 제외 */
+  return expiryDate < sixMonthsAfterTrip;
+}
+
+
+function getTripEndDate(trip) {
+  const legs =
+    trip && Array.isArray(trip.legs)
+      ? trip.legs.slice().sort(function (a, b) {
+          return Number(a.sequence || 0) -
+                 Number(b.sequence || 0);
+        })
+      : [];
+
+  const lastLeg = legs.length
+    ? legs[legs.length - 1]
+    : null;
+
+  const lastArrival = String(
+    lastLeg && (
+      lastLeg.arrivalLocal ||
+      lastLeg.arrivalLocalDateTime
+    ) || ''
+  ).trim();
+
+  return lastArrival
+    ? lastArrival.slice(0, 10)
+    : String(trip && trip.toDate || '').slice(0, 10);
+}
+
+
+function renderPobRows(people, tripEndDate) {
   if (!Array.isArray(people) || !people.length) {
     return (
       '<tr>' +
@@ -2861,6 +2936,12 @@ function renderPobRows(people) {
     const expiry = String(
       person.passportExpiry || ''
     ).trim();
+    const expiringSoon =
+      person.isExpired !== true &&
+      isPassportExpiringWithinSixMonths(
+        expiry,
+        tripEndDate
+      );
     const dateOfBirth = String(
       person.dateOfBirth || ''
     ).trim();
@@ -2882,7 +2963,8 @@ function renderPobRows(people) {
     function renderCell(
       value,
       fieldName,
-      extraClass
+      extraClass,
+      extraTitle
     ) {
       const cellClass =
         getPobRawFieldClass(
@@ -2892,7 +2974,7 @@ function renderPobRows(people) {
         );
 
       const title =
-        getPobRawFieldTitle(
+        extraTitle || getPobRawFieldTitle(
           person,
           fieldName
         );
@@ -2982,6 +3064,11 @@ function renderPobRows(people) {
           'passportExpiry',
           person.isExpired === true
             ? 'pob-expired'
+            : expiringSoon
+              ? 'pob-expiring-soon'
+              : '',
+          expiringSoon
+            ? '여권 만료일까지 6개월 미만 남았으니 확인이 필요합니다.'
             : ''
         ) +
 
@@ -3009,7 +3096,7 @@ function renderPobRows(people) {
 }
 
 
-function renderPobGroup(title, people) {
+function renderPobGroup(title, people, tripEndDate) {
   return (
     '<section class="pob-group">' +
       '<div class="pob-group-title">' +
@@ -3028,7 +3115,7 @@ function renderPobGroup(title, people) {
             '</tr>' +
           '</thead>' +
           '<tbody>' +
-            renderPobRows(people) +
+            renderPobRows(people, tripEndDate) +
           '</tbody>' +
         '</table>' +
       '</div>' +
@@ -3040,7 +3127,8 @@ function renderPobGroup(title, people) {
 function renderPobDetails(
   leg,
   tripIndex,
-  legIndex
+  legIndex,
+  tripEndDate
 ) {
   const pob = getLegPobInfo(leg);
 
@@ -3054,8 +3142,8 @@ function renderPobDetails(
       'id="pobDetails-' +
         tripIndex + '-' + legIndex +
       '">' +
-        renderPobGroup('Crew', pob.crew) +
-        renderPobGroup('Pax', pob.pax) +
+        renderPobGroup('Crew', pob.crew, tripEndDate) +
+        renderPobGroup('Pax', pob.pax, tripEndDate) +
     '</div>'
   );
 }
@@ -4352,7 +4440,8 @@ async function openRouteModal(tripIndex) {
           renderPobDetails(
             leg,
             tripIndex,
-            legIndex
+            legIndex,
+            getTripEndDate(trip)
           ) +
 
           '<div ' +
