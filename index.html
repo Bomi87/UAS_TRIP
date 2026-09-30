@@ -1605,15 +1605,11 @@
           </span>
         </div>
 
-        <p class="card-subtitle">
-          'HLxxxx' 버튼을 누르면 상세 준비상태를 확인할 수 있습니다.
-        </p>
-
         <div
           id="manifestValidationStatus"
           style="
             display:none;
-            margin:-8px 0 14px;
+            margin:0 0 18px;
             color:#64748b;
             font-size:12px;
             font-weight:700;
@@ -1727,9 +1723,6 @@
     ></div>
   </div>
 </div>
-    <footer class="footer">
-      로그인 정보와 GTMx Token은 GitHub에 저장하지 않습니다.
-    </footer>
   </main>
   </div>
 
@@ -1888,7 +1881,11 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
         const timeout = window.setTimeout(function () {
           cleanup();
           reject(
-            new Error('Apps Script 응답 시간이 초과되었습니다.')
+            new Error(
+              'Apps Script 응답 시간이 초과되었습니다. [' +
+              action +
+              ']'
+            )
           );
         }, 180000);
 
