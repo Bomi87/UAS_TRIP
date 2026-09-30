@@ -1609,6 +1609,17 @@
           'HLxxxx' 버튼을 누르면 상세 준비상태를 확인할 수 있습니다.
         </p>
 
+        <div
+          id="manifestValidationStatus"
+          style="
+            display:none;
+            margin:-8px 0 14px;
+            color:#64748b;
+            font-size:12px;
+            font-weight:700;
+          "
+        ></div>
+
         <div class="table-wrap">
           <table>
             <thead>
@@ -1784,6 +1795,9 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
 
     lastUpdatedBadge:
       document.getElementById('lastUpdatedBadge'),
+
+    manifestValidationStatus:
+      document.getElementById('manifestValidationStatus'),
 
     downloadButton:
       document.getElementById('downloadButton'),
@@ -1992,6 +2006,18 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
     }
 
 
+    function setManifestValidationStatus(message, isVisible) {
+      const el = elements.manifestValidationStatus;
+
+      if (!el) {
+        return;
+      }
+
+      el.textContent = message || '';
+      el.style.display = isVisible ? 'block' : 'none';
+    }
+
+
     /**
      * CREW/PAX RAW Spreadsheet 검증은 메인 dashboard와 분리하여
      * 화면이 먼저 표시된 뒤 백그라운드에서 가져옵니다.
@@ -1999,6 +2025,11 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
     async function loadManifestValidation() {
       const requestedSnapshotGeneratedAt =
         state.dashboardSnapshotGeneratedAt || '';
+
+      setManifestValidationStatus(
+        'CREW/PAX 검증 중...',
+        true
+      );
 
       try {
         const result =
@@ -2040,6 +2071,15 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
           saveDashboardToSessionCache();
         }
 
+        setManifestValidationStatus(
+          'CREW/PAX 검증 완료',
+          true
+        );
+
+        window.setTimeout(function () {
+          setManifestValidationStatus('', false);
+        }, 1800);
+
         return result;
 
       } catch (error) {
@@ -2051,6 +2091,15 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
           'Manifest RAW validation load failed:',
           error
         );
+
+        setManifestValidationStatus(
+          'CREW/PAX 검증을 불러오지 못했습니다.',
+          true
+        );
+
+        window.setTimeout(function () {
+          setManifestValidationStatus('', false);
+        }, 3000);
 
         return null;
       }
