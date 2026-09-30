@@ -1941,6 +1941,24 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
     }
 
 
+    async function loadDashboardSnapshotWithRetry() {
+      try {
+        return await loadDashboardSnapshot();
+      } catch (firstError) {
+        console.warn(
+          'Dashboard first load failed. Retrying once...',
+          firstError
+        );
+
+        await new Promise(function (resolve) {
+          window.setTimeout(resolve, 1500);
+        });
+
+        return await loadDashboardSnapshot();
+      }
+    }
+
+
     async function loadDashboardSnapshot() {
       const result =
         await callBackend('dashboard');
@@ -2346,7 +2364,7 @@ async function loadBriefServices(
           state.dashboardGeneratedAt || '';
 
         const result =
-          await loadDashboardSnapshot();
+          await loadDashboardSnapshotWithRetry();
 
         if (!silent) {
           writeLog('저장된 대시보드 조회 완료', {
