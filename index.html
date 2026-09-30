@@ -2478,12 +2478,6 @@ async function loadBriefServices(
 
         saveDashboardToSessionCache();
 
-        /*
-         * 메인 Dashboard는 여기서 이미 화면에 표시되었습니다.
-         * CREW/PAX RAW 검증은 별도 요청으로 실행하며 기다리지 않습니다.
-         */
-        loadManifestValidation();
-
         if (
           silent &&
           previousGeneratedAt &&
@@ -4746,12 +4740,19 @@ function startGtmxAppAfterAuth() {
    * 세션 캐시는 화면을 즉시 보여주는 용도로만 사용합니다.
    * 앱을 열 때마다 dashboard를 한 번 호출하여
    * 30분 스냅샷을 먼저 화면에 표시합니다.
-   * CREW/PAX RAW 검증은 화면 표시 후 별도 manifest 요청으로 적용합니다.
+   * CREW/PAX RAW 검증은 최초 진입 시 한 번만 별도 manifest 요청으로 적용합니다.
+   * 이후 5분 자동 확인이나 visibilitychange에서는 다시 검증하지 않습니다.
    */
   if (restored) {
-    refreshDashboard(true);
+    refreshDashboard(true)
+      .then(function () {
+        loadManifestValidation();
+      });
   } else {
-    refreshDashboard(false);
+    refreshDashboard(false)
+      .then(function () {
+        loadManifestValidation();
+      });
   }
 
   startFrontendSnapshotCheck();
