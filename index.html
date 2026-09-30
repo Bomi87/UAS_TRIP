@@ -1871,12 +1871,17 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
           }
         });
 
+        const timeoutMs =
+          action === 'dashboard'
+            ? 15000
+            : 180000;
+
         const timeout = window.setTimeout(function () {
           cleanup();
           reject(
             new Error('Apps Script 응답 시간이 초과되었습니다.')
           );
-        }, 180000);
+        }, timeoutMs);
 
         function cleanup() {
           window.clearTimeout(timeout);
