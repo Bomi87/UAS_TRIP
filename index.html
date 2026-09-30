@@ -695,8 +695,7 @@
   font-size: 12px;
   line-height: 1.55;
   white-space: pre-wrap;
-  overflow-wrap: break-word;
-  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 
@@ -1756,7 +1755,8 @@ const DASHBOARD_SESSION_CACHE_MAX_AGE_MS =
     briefServicesByTripLeg: Object.create(null),
     briefServicesPromise: null,
     briefCacheGeneratedAt: '',
-    dashboardGeneratedAt: ''
+    dashboardGeneratedAt: '',
+    dashboardSnapshotGeneratedAt: ''
   };
 
   // 백엔드는 30분마다 실제 데이터를 갱신합니다.
@@ -1871,17 +1871,12 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
           }
         });
 
-        const timeoutMs =
-          action === 'dashboard'
-            ? 15000
-            : 180000;
-
         const timeout = window.setTimeout(function () {
           cleanup();
           reject(
             new Error('Apps Script 응답 시간이 초과되었습니다.')
           );
-        }, timeoutMs);
+        }, 180000);
 
         function cleanup() {
           window.clearTimeout(timeout);
@@ -1946,24 +1941,6 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
     }
 
 
-    async function loadDashboardSnapshotWithRetry() {
-      try {
-        return await loadDashboardSnapshot();
-      } catch (firstError) {
-        console.warn(
-          'Dashboard first load failed. Retrying once...',
-          firstError
-        );
-
-        await new Promise(function (resolve) {
-          window.setTimeout(resolve, 1500);
-        });
-
-        return await loadDashboardSnapshot();
-      }
-    }
-
-
     async function loadDashboardSnapshot() {
       const result =
         await callBackend('dashboard');
@@ -1998,6 +1975,9 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
         result.generatedAt ||
         '';
 
+      state.dashboardSnapshotGeneratedAt =
+        result.generatedAt || '';
+
       renderTrips(state.activeTrips);
       renderFiles(state.files);
 
@@ -2010,6 +1990,73 @@ const FRONTEND_SNAPSHOT_CHECK_MS =
 
       return result;
     }
+
+
+    /**
+     * CREW/PAX RAW Spreadsheet 검증은 메인 dashboard와 분리하여
+     * 화면이 먼저 표시된 뒤 백그라운드에서 가져옵니다.
+     */
+    async function loadManifestValidation() {
+      const requestedSnapshotGeneratedAt =
+        state.dashboardSnapshotGeneratedAt || '';
+
+      try {
+        const result =
+          await callBackend('manifest');
+
+        /*
+         * manifest 요청 중 30분 스냅샷이 새로 갱신된 경우,
+         * 이전/다른 스냅샷 기준 검증 결과가 현재 화면을 덮지 않게 합니다.
+         */
+        if (
+          requestedSnapshotGeneratedAt &&
+          result &&
+          result.generatedAt &&
+          String(result.generatedAt) !==
+            String(requestedSnapshotGeneratedAt)
+        ) {
+          console.log(
+            'Manifest validation skipped because dashboard snapshot changed:',
+            {
+              dashboard: requestedSnapshotGeneratedAt,
+              manifest: result.generatedAt
+            }
+          );
+
+          return result;
+        }
+
+        if (
+          result &&
+          Array.isArray(result.activeTrips)
+        ) {
+          state.activeTrips =
+            result.activeTrips;
+
+          renderTrips(
+            state.activeTrips
+          );
+
+          saveDashboardToSessionCache();
+        }
+
+        return result;
+
+      } catch (error) {
+        /*
+         * Manifest RAW 검증 실패는 메인 Dashboard 표시를 막지 않습니다.
+         * 기존 Trip / Service / PDF 화면은 그대로 유지합니다.
+         */
+        console.warn(
+          'Manifest RAW validation load failed:',
+          error
+        );
+
+        return null;
+      }
+    }
+
+
     async function loadFiles() {
       const result =
         await callBackend('list');
@@ -2369,7 +2416,7 @@ async function loadBriefServices(
           state.dashboardGeneratedAt || '';
 
         const result =
-          await loadDashboardSnapshotWithRetry();
+          await loadDashboardSnapshot();
 
         if (!silent) {
           writeLog('저장된 대시보드 조회 완료', {
@@ -2381,6 +2428,12 @@ async function loadBriefServices(
         }
 
         saveDashboardToSessionCache();
+
+        /*
+         * 메인 Dashboard는 여기서 이미 화면에 표시되었습니다.
+         * CREW/PAX RAW 검증은 별도 요청으로 실행하며 기다리지 않습니다.
+         */
+        loadManifestValidation();
 
         if (
           silent &&
@@ -4643,8 +4696,8 @@ function startGtmxAppAfterAuth() {
   /*
    * 세션 캐시는 화면을 즉시 보여주는 용도로만 사용합니다.
    * 앱을 열 때마다 dashboard를 한 번 호출하여
-   * 조업상태는 기존 30분 스냅샷을 그대로 받고,
-   * CREW/PAX RAW 검증만 현재 Spreadsheet 기준으로 새로 적용합니다.
+   * 30분 스냅샷을 먼저 화면에 표시합니다.
+   * CREW/PAX RAW 검증은 화면 표시 후 별도 manifest 요청으로 적용합니다.
    */
   if (restored) {
     refreshDashboard(true);
